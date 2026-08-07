@@ -1,0 +1,37 @@
+/**
+ * Intent: design tokens (colors, fonts, radii, font-size scale).
+ * Architecture: CSS variables on :root / [data-font-size]; consumed by all other sheets.
+ */
+:root {
+  /* move_by_move palette */
+  --bg: #f7f0e4;
+  --bg-elev: #fff9f0;
+  --bg-soft: #ebe2d4;
+  --ink: #4f3389;
+  --ink-soft: #6b5a8a;
+  --muted: #6b5a8a;
+  --line: #e0d4c8;
+  --line-strong: #c9b8d4;
+  --accent: #e91e63;
+  --accent-hover: #c2185b;
+  --accent-soft: #f48fb1;
+  --accent-pale: #fce4ec;
+  --accent-ink: #ffffff;
+  --accent-dim: #fce4ec;
+  --user: #fff9f0;
+  --danger: #d32f5f;
+  --ok: #2e7d57;
+  --code: #ebe2d4;
+  --shadow: 0 10px 32px rgba(79, 51, 137, 0.1);
+  --shadow-soft: 0 2px 10px rgba(79, 51, 137, 0.06);
+  --col: min(48rem, calc(100% - 2rem));
+  --font-display: "Bebas Neue", Impact, sans-serif;
+  --font-body: Montserrat, "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html[data-font-size="sm"] { --font-size: 14px; }
+html[data-font-size="md"] { --font-size: 15px; }
+html[data-font-size="lg"] { --font-size: 16px; }
+html[data-font-size="xl"] { --font-size: 17.5px; }

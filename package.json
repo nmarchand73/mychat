@@ -1,0 +1,9 @@
+{
+  "name": "mychat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/run.mjs",
+    "test:js": "node test/run.mjs --js-only"
+  }
+}

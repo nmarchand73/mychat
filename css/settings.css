@@ -1,0 +1,274 @@
+/**
+ * Intent: Settings popover — model, font, toggles, facts, RAG ingest.
+ * Architecture: <details> panel; memory controls mirror orchestrator settings.
+ */
+.settings {
+  position: relative;
+}
+
+.settings > summary {
+  list-style: none;
+  appearance: none;
+  cursor: pointer;
+  user-select: none;
+  font: 500 0.82rem var(--font-body);
+  color: var(--muted);
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.settings > summary::-webkit-details-marker { display: none; }
+.settings > summary:hover { color: var(--ink); border-color: var(--line-strong); }
+.settings[open] > summary {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.settings-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(78vh, 640px);
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+  z-index: 20;
+  animation: pop 0.2s var(--ease) both;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+
+.settings-row label.field {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.settings-panel .toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.settings-panel .toggle input {
+  appearance: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-muted, var(--bg-soft)) 70%, #fff);
+  border: 1px solid var(--line);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex: 0 0 auto;
+}
+
+.settings-panel .toggle input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.settings-panel .toggle input:checked {
+  background: var(--accent);
+  border-color: var(--accent-hover);
+}
+
+.settings-panel .toggle input:checked::after {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+.settings-panel .toggle input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-panel .toggle.unsupported { opacity: 0.45; cursor: not-allowed; }
+.settings-panel .toggle.on { color: var(--ink); }
+
+.settings-panel .ghost {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: 500 0.82rem var(--font-body);
+  cursor: pointer;
+  padding: 7px 12px;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.settings-panel .ghost:hover { color: var(--ink); border-color: var(--line-strong); }
+.settings-panel .ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.meta select {
+  appearance: none;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%) calc(100% - 12px) / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%) calc(100% - 7px) / 5px 5px no-repeat,
+    var(--bg-soft);
+  color: var(--ink);
+  font: 500 0.84rem var(--font-body);
+  padding: 7px 28px 7px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  max-width: 180px;
+}
+
+.meta select:focus {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.meta select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.settings-sep {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2px 0;
+}
+
+.memory-box {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--accent-pale) 35%, var(--bg-elev));
+}
+
+.memory-add {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.memory-box input[type="text"],
+.memory-box textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: 400 0.86rem var(--font-body);
+  padding: 8px 10px;
+  outline: none;
+  resize: vertical;
+}
+
+.memory-box input:focus,
+.memory-box textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.settings-panel .ghost.tight {
+  width: auto;
+  padding: 7px 10px;
+}
+
+.font-size-picks {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+}
+
+.font-size-picks button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 600 0.78rem var(--font-body);
+  min-width: 2rem;
+  padding: 5px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.font-size-picks button[aria-pressed="true"] {
+  background: var(--accent-pale);
+  color: var(--accent);
+}
+
+.font-size-picks button:hover { color: var(--ink); }
+
+.fact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.fact-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+
+.fact-list li span { flex: 1; min-width: 0; }
+
+.fact-list button {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.fact-list button:hover { color: var(--danger); }

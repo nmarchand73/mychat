@@ -1,0 +1,180 @@
+/**
+ * Intent: bottom dock — composer, send/stop, refine/edit banners, status.
+ * Architecture: fixed dock over the thread; form.busy swaps send ↔ stop.
+ */
+.dock {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 14px;
+  background:
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 70%, transparent) 28%, var(--bg));
+  z-index: 4;
+}
+
+.dock-inner {
+  width: min(100%, var(--col));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-banner,
+.refine-banner {
+  flex: 0 0 auto;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.edit-banner.on,
+.refine-banner.on { display: flex; }
+
+.edit-banner { background: color-mix(in srgb, #3d5a80 12%, var(--bg-elev)); }
+.refine-banner { background: var(--accent-pale); }
+
+.edit-banner button,
+.refine-banner button {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 0.8rem var(--font-body);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.refine-banner img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 26px;
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  animation: rise 0.55s var(--ease) 0.05s both;
+}
+
+.composer:focus-within {
+  border-color: var(--accent-soft);
+  box-shadow:
+    0 0 0 3px var(--accent-pale),
+    var(--shadow);
+}
+
+.composer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-self: end;
+}
+
+textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 180px;
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 400 1rem/1.45 var(--font-body);
+  padding: 10px 4px;
+  outline: none;
+  field-sizing: content;
+}
+
+textarea::placeholder { color: color-mix(in srgb, var(--muted) 85%, transparent); }
+
+.send,
+.stop {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  font: 600 0.92rem var(--font-body);
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), filter 0.15s, opacity 0.15s;
+  display: inline-grid;
+  place-items: center;
+}
+
+.send {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.send:hover:not(:disabled) {
+  background: var(--accent-hover);
+  filter: none;
+  transform: scale(1.04);
+}
+.send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.stop {
+  display: none;
+  background: color-mix(in srgb, var(--danger) 88%, #4f3389);
+  color: #fff;
+}
+
+.stop.on { display: inline-grid; }
+.stop:hover { filter: brightness(1.08); }
+
+.composer.busy .send { display: none; }
+.composer.busy .stop.on { display: inline-grid; }
+
+.send svg,
+.stop svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  min-height: 1.1em;
+  padding: 2px 4px 0;
+  text-align: center;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: 0 0 auto;
+}
+
+.dot.busy {
+  background: var(--accent);
+  animation: pulse 1.2s ease infinite;
+}
+
+.dot.err { background: var(--danger); animation: none; }

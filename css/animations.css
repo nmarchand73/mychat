@@ -1,0 +1,32 @@
+/**
+ * Intent: small motion primitives (rise, pulse, phase-dot).
+ * Architecture: @keyframes only; applied via classes in chat/composer.
+ */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+@media (max-width: 560px) {
+  .topbar { padding: 10px 12px; }
+  .brand { font-size: 1.2rem; }
+  .thread { padding: 18px 12px 8px; gap: 18px; }
+  .dock { padding: 0 10px 10px; }
+  .bubble.bot { font-size: 1rem; }
+  .bubble .md { font-size: 1rem; }
+}

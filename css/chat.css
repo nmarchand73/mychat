@@ -1,0 +1,669 @@
+/**
+ * Intent: conversation thread — bubbles, markdown, think, tool/memory cards.
+ * Architecture: .stage/.thread scroll area; message chrome is class-driven (.bubble, .tool-use, .thought).
+ */
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+  padding: 28px max(16px, calc(50% - 24rem)) 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  align-items: stretch;
+}
+
+.thread::-webkit-scrollbar { width: 8px; }
+.thread::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 99px;
+}
+
+.empty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  max-width: 28rem;
+  line-height: 1.5;
+  padding: 48px 12px 72px;
+  animation: rise 0.65s var(--ease) both;
+}
+
+.empty strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  color: var(--ink);
+  margin-bottom: 10px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+}
+
+.bubble {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  line-height: 1.65;
+  word-break: break-word;
+  animation: fade-in 0.32s var(--ease) both;
+  background: transparent;
+  border: 0;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  width: fit-content;
+  max-width: min(85%, 36rem);
+  margin-left: auto;
+  background: var(--user);
+  border: 1px solid var(--accent-soft);
+  border-radius: 22px;
+  border-bottom-right-radius: 8px;
+  padding: 12px 16px;
+  white-space: pre-wrap;
+  position: relative;
+  color: var(--ink);
+  box-shadow: var(--shadow-soft);
+}
+
+.bubble.user .user-text {
+  display: block;
+  font-size: 1.02rem;
+}
+
+.bubble .msg-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+
+.bubble.user .msg-actions {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.bubble.user:hover .msg-actions,
+.bubble.user:focus-within .msg-actions {
+  opacity: 1;
+}
+
+.bubble .msg-actions button {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 0.78rem var(--font-body);
+  cursor: pointer;
+  padding: 0;
+}
+
+.bubble .msg-actions button:hover { text-decoration: underline; }
+.bubble .msg-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.bubble.bot {
+  align-self: stretch;
+  color: var(--ink-soft);
+  font-size: 1rem;
+}
+
+.bubble.system {
+  align-self: center;
+  width: auto;
+  max-width: 100%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0;
+  text-align: center;
+  white-space: pre-wrap;
+  opacity: 0.85;
+}
+
+.bubble .label {
+  display: none;
+}
+
+.bubble .thought {
+  margin: 0 0 12px;
+  border: 0;
+  background: transparent;
+}
+
+.bubble .thought > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.bubble .thought > summary::-webkit-details-marker { display: none; }
+
+.bubble .thought > summary .thought-label {
+  color: color-mix(in srgb, var(--ink) 70%, var(--muted));
+}
+
+.bubble .thought > summary .thought-meta {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.bubble .thought > summary .chevron {
+  width: 0.5em;
+  height: 0.5em;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  margin-left: 2px;
+  opacity: 0.85;
+}
+
+.bubble .thought[open] > summary .chevron {
+  transform: rotate(-135deg);
+  translate: 0 2px;
+}
+
+.bubble .thought .thought-body {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.bubble .thought.streaming > summary .thought-meta {
+  color: var(--accent);
+}
+
+.bubble .tool-use,
+.thread > .tool-use {
+  width: 100%;
+  margin: 0 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-elev) 92%, var(--accent-pale));
+  overflow: hidden;
+}
+
+.bubble .tool-use > summary,
+.thread > .tool-use > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  user-select: none;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.bubble .tool-use > summary::-webkit-details-marker,
+.thread > .tool-use > summary::-webkit-details-marker { display: none; }
+
+.bubble .tool-use .tool-icon,
+.thread > .tool-use .tool-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.bubble .tool-use .tool-icon svg,
+.thread > .tool-use .tool-icon svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bubble .tool-use .tool-title,
+.thread > .tool-use .tool-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bubble .tool-use .tool-name,
+.thread > .tool-use .tool-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.bubble .tool-use .tool-preview,
+.thread > .tool-use .tool-preview {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bubble .tool-use .tool-status,
+.thread > .tool-use .tool-status {
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.bubble .tool-use.running .tool-status,
+.thread > .tool-use.running .tool-status {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--accent-dim);
+}
+
+.bubble .tool-use.done .tool-status,
+.thread > .tool-use.done .tool-status {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+
+.bubble .tool-use.error .tool-status,
+.thread > .tool-use.error .tool-status {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+}
+
+.bubble .tool-use .tool-chevron,
+.thread > .tool-use .tool-chevron {
+  width: 0.5em;
+  height: 0.5em;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  opacity: 0.8;
+  flex: 0 0 auto;
+  margin-right: 2px;
+}
+
+.bubble .tool-use[open] .tool-chevron,
+.thread > .tool-use[open] .tool-chevron {
+  transform: rotate(-135deg);
+  translate: 0 2px;
+}
+
+.bubble .tool-use .tool-body,
+.thread > .tool-use .tool-body {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.bubble .tool-use .tool-section-label,
+.thread > .tool-use .tool-section-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.bubble .tool-use .tool-input,
+.thread > .tool-use .tool-input {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--ink) 88%, var(--muted));
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble .tool-use .tool-results,
+.thread > .tool-use .tool-results {
+  display: grid;
+  gap: 8px;
+}
+
+.bubble .tool-use .tool-result,
+.thread > .tool-use .tool-result {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--accent-pale) 40%, #fff);
+}
+
+.bubble .tool-use .tool-result a,
+.thread > .tool-use .tool-result a {
+  color: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.bubble .tool-use .tool-result a:hover,
+.thread > .tool-use .tool-result a:hover { text-decoration: underline; }
+
+.bubble .tool-use .tool-result .url,
+.thread > .tool-use .tool-result .url {
+  color: var(--muted);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubble .tool-use .tool-result .snippet,
+.thread > .tool-use .tool-result .snippet {
+  color: color-mix(in srgb, var(--ink) 75%, var(--muted));
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.bubble .tool-use .tool-empty,
+.bubble .tool-use .tool-error-text,
+.thread > .tool-use .tool-empty,
+.thread > .tool-use .tool-error-text {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.bubble .tool-use .tool-error-text,
+.thread > .tool-use .tool-error-text { color: var(--danger); }
+
+.bubble .tool-use.running .tool-icon,
+.thread > .tool-use.running .tool-icon {
+  animation: pulse 1.2s ease infinite;
+}
+
+.bubble .md .phase {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+.bubble .md .phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+  animation: pulse 1.1s ease infinite;
+}
+
+.bubble .memory-compact,
+.thread > .memory-compact {
+  width: 100%;
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-elev) 88%, var(--accent-pale));
+  overflow: hidden;
+}
+
+.bubble .memory-compact > summary,
+.thread > .memory-compact > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  user-select: none;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.bubble .memory-compact > summary::-webkit-details-marker,
+.thread > .memory-compact > summary::-webkit-details-marker { display: none; }
+
+.bubble .memory-compact .mc-icon,
+.thread > .memory-compact .mc-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.bubble .memory-compact.running .mc-icon,
+.thread > .memory-compact.running .mc-icon {
+  animation: pulse 1.2s ease infinite;
+}
+
+.bubble .memory-compact .mc-title,
+.thread > .memory-compact .mc-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bubble .memory-compact .mc-name,
+.thread > .memory-compact .mc-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.bubble .memory-compact .mc-preview,
+.thread > .memory-compact .mc-preview {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bubble .memory-compact .mc-status,
+.thread > .memory-compact .mc-status {
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.bubble .memory-compact.running .mc-status,
+.thread > .memory-compact.running .mc-status {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--accent-dim);
+}
+
+.bubble .memory-compact.done .mc-status,
+.thread > .memory-compact.done .mc-status {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+
+.bubble .memory-compact .mc-body,
+.thread > .memory-compact .mc-body {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.bubble .md {
+  font-size: 1rem;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  color: var(--ink-soft);
+}
+
+.bubble .md > :first-child { margin-top: 0; }
+.bubble .md > :last-child { margin-bottom: 0; }
+
+.bubble .md h1,
+.bubble .md h2,
+.bubble .md h3,
+.bubble .md h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.15;
+  margin: 1.1em 0 0.4em;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+}
+
+.bubble .md h1 { font-size: 1.4rem; }
+.bubble .md h2 { font-size: 1.22rem; }
+.bubble .md h3 { font-size: 1.1rem; }
+
+.bubble .md p { margin: 0.65em 0; }
+.bubble .md ul,
+.bubble .md ol { margin: 0.55em 0; padding-left: 1.35em; }
+.bubble .md li { margin: 0.25em 0; }
+.bubble .md li + li { margin-top: 0.2em; }
+
+.bubble .md blockquote {
+  margin: 0.8em 0;
+  padding: 0.15em 0 0.15em 0.95em;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.bubble .md a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bubble .md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.1em 0;
+}
+
+.bubble .md code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--accent-pale);
+  padding: 0.12em 0.35em;
+  border-radius: 5px;
+  color: var(--accent-hover);
+}
+
+.bubble .md pre {
+  margin: 0.8em 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  max-width: 100%;
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.bubble .md pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.bubble .md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 0.92rem;
+}
+
+.bubble .md th,
+.bubble .md td {
+  border: 1px solid var(--line);
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.bubble .md th { background: var(--accent-pale); }
+
+.bubble .md img {
+  display: block;
+  max-width: min(100%, 480px);
+  border-radius: 12px;
+  margin: 0.7em 0;
+}
+
+.bubble > img {
+  display: block;
+  width: min(100%, 480px);
+  border-radius: 14px;
+  margin-top: 4px;
+}
+
+.bubble .img-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.bubble .img-actions a,
+.bubble .img-actions button {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 0.88rem var(--font-body);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.bubble .img-actions button:hover,
+.bubble .img-actions a:hover { text-decoration: underline; }
