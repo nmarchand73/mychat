@@ -1,73 +1,93 @@
 ---
-description: Boy Scout rule — leave every touched file better and raise its quality score
+description: Boy Scout cleanup + sub-agent Quality scoring after every edit
 alwaysApply: true
 ---
 
-<!-- Quality: 9/10 — clear score contract + scale; could add one concrete before/after example -->
+<!-- Quality: 9/10 — scoring contract + prompt template clear; Task model tip may go stale -->
 
 # Boy Scout rule
 
-**Each time you create or modify a file, leave it better than you found it**, and **record / raise a code-quality score in that file’s header**.
+Two duties on every create/edit batch:
 
-## Quality score (required on every create / edit)
+1. **You (parent agent)** — leave touched files better (local cleanup).
+2. **Sub-agent (required)** — at the **end** of the modification batch, score those files and write `Quality: N/10` headers.
 
-At the end of your change to a file, ensure its header includes a **Quality** line:
+Do **not** self-assign final Quality scores in the parent turn. The scorer sub-agent owns the numbers.
 
-```text
-Quality: N/10 — short note (what holds the score back, or why it’s strong)
-```
+---
 
-### Where it lives
+## 1. Parent: Boy Scout cleanup (during the edit)
 
-| Kind | Placement |
-|------|-----------|
-| JS / CSS / Python | In the top module comment, after Intent / Architecture |
-| HTML | HTML comment near the top of `<body>` or after `<!DOCTYPE>` |
-| Cursor `.mdc` rules | HTML comment immediately after the YAML frontmatter |
-
-Example (JS):
-
-```js
-/**
- * Intent: …
- * Architecture: …
- * Quality: 7/10 — clear facade; createChat still a bit long
- */
-```
-
-### Scale (be honest)
-
-| Score | Meaning |
-|------|---------|
-| 1–3 | Hard to follow, mixed concerns, or dangerous edges |
-| 4–5 | Works but messy / oversized / weak boundaries |
-| 6–7 | Solid and readable; a few concrete smells remain |
-| 8–9 | Clean, focused, easy to change; minor nits only |
-| 10 | Reserved — essentially nothing useful left to improve in-file |
-
-If the file had **no** score yet, **add one** (first estimate after your edit).  
-If it already had a score, **try to improve it by ≥1** via a real local cleanup in the same edit (not by inflating the number). If you cannot raise it this pass, keep the score and update the note with what still blocks a higher mark.
-
-## Boy Scout cleanup (required)
-
-On every touched file, also do **one** nearby improvement, for example:
+For each file you create or change, do **one** nearby improvement in the same edit, for example:
 
 - Remove dead code / obsolete comments
 - Fix a misleading name next to your change
 - Refresh Intent / Architecture if the role shifted
-- Dedupe a helper you just had to touch
+- Dedupe a helper you just touched
 - Drop an unused import
-- Split or extract only if it clearly raises the Quality score without widening scope
 
-## Limits
+**Limits:** only files required for the task; no repo-wide cleanups; no formatting-only drive-bys; no deleting tests to “simplify.”
 
-- Only files required for the task — no repo-wide score campaigns.
-- Do not bump the score without a real improvement.
-- Do not expand into unrelated refactors or formatting-only diffs.
-- Prefer the smallest change that raises clarity or the score.
+---
+
+## 2. Sub-agent: Quality scoring (end of every modif)
+
+After your code/docs edits for the user request are done (and tests you owed are run), **always** launch a **Task** sub-agent before your final user reply.
+
+### How to launch
+
+Use the `Task` tool:
+
+- `subagent_type`: `generalPurpose` (or `explore` if read-only scoring + header writes are enough and the model can edit)
+- `model`: `fast` when available (scoring is narrow)
+- `description`: `Score MyChat file quality`
+- Prefer **one** sub-agent per turn covering **all** files created/modified in this batch (not one agent per file)
+
+### Sub-agent prompt (use this shape)
+
+```text
+You are the MyChat Boy Scout Quality scorer. Independent of the parent’s optimism.
+
+Repo: /Users/nicolasmarchand/Documents/Dev/Projects/MyChat
+
+Files to score (created or modified this turn):
+- <absolute or repo-relative path>
+- …
+
+For EACH file:
+1. Read the full file (or enough to judge structure).
+2. Read any existing `Quality: N/10 — …` line.
+3. Assign an honest score with the scale below.
+4. Upsert the Quality line in the correct header place (do not invent Intent/Architecture if missing—only add Quality; if Intent/Architecture exist, keep them and put Quality after).
+5. If a prior score exists, you may raise it only when the file clearly improved; never inflate. You may lower it if the edit made things worse.
+6. Note must be short and concrete (what blocks a higher score, or why it’s strong).
+
+Header placement:
+- JS/CSS/Python: top module comment → `* Quality: N/10 — note`
+- HTML: `<!-- Quality: N/10 — note -->` near top
+- Cursor `.mdc`: HTML comment right after YAML frontmatter
+- Markdown README: HTML comment at top
+
+Scale:
+1–3 hard to follow / mixed concerns / dangerous
+4–5 works but messy or oversized
+6–7 solid; a few concrete smells
+8–9 clean and easy to change; minor nits
+10 reserved — essentially nothing useful left in-file
+
+Return to parent: a bullet list `path → N/10 — note` only. No refactors beyond the Quality line (and fixing a malformed existing Quality line).
+```
+
+### After the sub-agent returns
+
+- Briefly trust its scores; do not rewrite them upward in the parent.
+- If the sub-agent failed to launch, say so in one line and apply best-effort scores yourself as fallback (exception only).
+
+---
 
 ## ❌ Avoid
 
-- “I’ll score / clean it later” on a file you already edited
-- Raising `Quality` while leaving known dead code in that file
-- Deleting tests or weakening contracts to “simplify”
+- Parent inventing final `Quality` scores “to save a turn”
+- Scoring files you did not touch
+- Sub-agent doing feature work or broad refactors
+- Raising scores without evidence in the file contents

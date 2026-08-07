@@ -4,7 +4,7 @@ globs: "**/*.{js,css,html,py,mjs,mdc}"
 alwaysApply: false
 ---
 
-<!-- Quality: 9/10 — contracts cover sidebar/delete/regen/export/tool restore -->
+<!-- Quality: 9/10 — contracts thorough and scannable; slight overlap with modularity rule -->
 
 # MyChat coding practices
 
@@ -15,7 +15,7 @@ alwaysApply: false
 - Match existing naming: `createX`, `runChat` / `runImage`, `setStatus`, `persistSession`.
 - Escape user/tool HTML (`escapeHtml`); Markdown goes through `renderMarkdown` (DOMPurify + `target=_blank`).
 - Use `isAbortError` / `StoppedError` for cancel paths; never swallow abort as a normal failure.
-- On every create/edit: keep **Intent / Architecture / Quality: N/10** in the file header (Boy Scout rule) and try to raise the score.
+- On every create/edit batch: parent does a local Boy Scout cleanup; a **sub-agent** assigns final `Quality: N/10` headers (see `mychat-boyscout.mdc`).
 
 ## Product contracts
 

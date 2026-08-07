@@ -2,7 +2,7 @@
  * Intent: run one chat turn end-to-end (memory prep → tools → stream answer).
  * Architecture: factory `createChatRunner(deps)` closes over UI/memory callbacks;
  * talks to Ollama `/api/chat` and local `/api/search`; does not own DOM state.
- * Quality: 7/10 — pipeline clear; runChat still long, tools now sibling+persisted
+ * Quality: 8/10 — streaming caret/is-generating wired; runChat still long
  */
 
 import {
@@ -112,6 +112,7 @@ export function createChatRunner(deps) {
     const body = document.createElement("div");
     body.className = "md";
     bot.appendChild(body);
+    bot.classList.add("is-generating");
     persistSession();
 
     const baseSystem = wantSearch
@@ -339,8 +340,10 @@ export function createChatRunner(deps) {
         if (thought) thought.update(thinking, { streaming: true });
         if (answer || thinking) {
           clearedPhase = true;
-          setMarkdown(body, answer || "_Thinking…_");
+          bot.classList.add("is-generating");
+          setMarkdown(body, answer || "_Thinking…_", { streaming: true });
         } else if (!clearedPhase) {
+          bot.classList.add("is-generating");
           setWorkingPhase(
             body,
             usedTools
@@ -385,7 +388,8 @@ export function createChatRunner(deps) {
       if (!answer.trim())
         answer = thinking ? "_(no final answer)_" : "_(empty reply)_";
       if (thought) thought.finish(thinking);
-      setMarkdown(body, answer);
+      bot.classList.remove("is-generating");
+      setMarkdown(body, answer, { streaming: false });
       scrollThreadToBottom();
       memory.conversation.pushAssistant(answer);
       recordThread(
@@ -400,6 +404,7 @@ export function createChatRunner(deps) {
       );
       persistSession();
     } catch (err) {
+      bot.classList.remove("is-generating");
       if (isAbortError(err)) {
         const tagged = extractThinkTags(fullContent);
         const thinking = wantThink
@@ -408,7 +413,7 @@ export function createChatRunner(deps) {
         const answer = wantThink ? tagged.content : stripThink(fullContent);
         if (thought) thought.finish(thinking);
         if (answer) {
-          setMarkdown(body, `${answer}\n\n_(stopped)_`);
+          setMarkdown(body, `${answer}\n\n_(stopped)_`, { streaming: false });
           memory.conversation.pushAssistant(answer);
           recordThread(
             {
@@ -422,7 +427,7 @@ export function createChatRunner(deps) {
           );
           persistSession();
         } else {
-          setMarkdown(body, "_(stopped)_");
+          setMarkdown(body, "_(stopped)_", { streaming: false });
           memory.conversation.truncateTo(checkpoint);
           persistSession();
         }

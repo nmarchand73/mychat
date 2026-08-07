@@ -1,4 +1,4 @@
-<!-- Quality: 8/10 — covers product + Boy Scout scoring; could add screenshots later -->
+<!-- Quality: 8/10 — product+arch+API solid; no screenshots or troubleshooting -->
 # MyChat
 
 Local chat UI for [Ollama](https://ollama.com) — chat, web search, image generation, and a layered memory stack. Everything runs on your machine; no cloud accounts.
@@ -100,7 +100,7 @@ memory/rag_store.py       chunk → embed (Ollama) → cosine retrieve
 
 ### Agent rules (Boy Scout + Quality score)
 
-Cursor rules in [`.cursor/rules/`](.cursor/rules/) keep the codebase maintainable: leave every touched file better than you found it (**Boy Scout**), and track a honest **`Quality: N/10 — note`** in each file header. On the next edit of that file, raise the score only with a real local cleanup — never by inflating the number. See `mychat-boyscout.mdc`, `mychat-modularity.mdc`, and `mychat-coding.mdc`.
+Cursor rules in [`.cursor/rules/`](.cursor/rules/) keep the codebase maintainable: the parent agent leaves every touched file a bit cleaner (**Boy Scout**), then a **sub-agent** scores those files at the end of the turn and writes an honest **`Quality: N/10 — note`** in each header (scores are not self-graded by the editor). See `mychat-boyscout.mdc`, `mychat-modularity.mdc`, and `mychat-coding.mdc`.
 
 ---
 

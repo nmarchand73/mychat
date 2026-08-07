@@ -1,7 +1,8 @@
 /**
  * Intent: turn model text into safe HTML; parse/display <think> blocks.
  * Architecture: marked → DOMPurify → force links to new tabs; thought UI
- * is a small details/summary widget used by the chat stream painter.
+ * is a details/summary widget; phase uses bouncing dots while waiting.
+ * Quality: 8/10 — streaming class + phase dots; no canvas/Lottie deps
  */
 
 import { escapeHtml } from "./util.js";
@@ -106,11 +107,20 @@ export function renderMarkdown(text) {
   return wrap.innerHTML;
 }
 
-export function setMarkdown(bodyEl, text) {
+export function setMarkdown(bodyEl, text, { streaming = false } = {}) {
+  bodyEl.classList.toggle("streaming", Boolean(streaming));
   bodyEl.innerHTML = renderMarkdown(text);
+  bodyEl.querySelectorAll("a[href]").forEach((a) => {
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+  });
 }
 
 export function setWorkingPhase(bodyEl, text) {
+  bodyEl.classList.remove("streaming");
   bodyEl.innerHTML =
-    `<p class="phase" aria-live="polite"><span class="phase-dot" aria-hidden="true"></span>${escapeHtml(text)}</p>`;
+    `<p class="phase" aria-live="polite">` +
+    `<span class="phase-dots" aria-hidden="true"><i></i><i></i><i></i></span>` +
+    `<span class="phase-text">${escapeHtml(text)}</span>` +
+    `</p>`;
 }

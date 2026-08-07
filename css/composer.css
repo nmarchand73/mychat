@@ -1,6 +1,7 @@
 /**
  * Intent: bottom dock — composer, send/stop, refine/edit banners, status.
  * Architecture: fixed dock over the thread; form.busy swaps send ↔ stop.
+ * Quality: 8/10 — busy breathe + status shimmer; still no voice/input polish
  */
 .dock {
   flex: 0 0 auto;
@@ -143,7 +144,10 @@ textarea::placeholder { color: color-mix(in srgb, var(--muted) 85%, transparent)
 .stop:hover { filter: brightness(1.08); }
 
 .composer.busy .send { display: none; }
-.composer.busy .stop.on { display: inline-grid; }
+.composer.busy .stop.on {
+  display: inline-grid;
+  animation: soft-breathe 1.25s ease-in-out infinite;
+}
 
 .send svg,
 .stop svg {
@@ -164,6 +168,21 @@ textarea::placeholder { color: color-mix(in srgb, var(--muted) 85%, transparent)
   text-align: center;
 }
 
+.composer.busy + .status #status,
+.dock-inner:has(.composer.busy) .status {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--accent) 40%,
+    var(--muted) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: status-shimmer 2.2s linear infinite;
+}
+
 .dot {
   width: 6px;
   height: 6px;
@@ -174,7 +193,7 @@ textarea::placeholder { color: color-mix(in srgb, var(--muted) 85%, transparent)
 
 .dot.busy {
   background: var(--accent);
-  animation: pulse 1.2s ease infinite;
+  animation: bounce-dot 1s ease-in-out infinite;
 }
 
 .dot.err { background: var(--danger); animation: none; }

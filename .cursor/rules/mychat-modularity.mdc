@@ -3,7 +3,7 @@ description: MyChat modularity — keep thin modules, composition root, and clea
 alwaysApply: true
 ---
 
-<!-- Quality: 9/10 — layout includes export.js; Quality header contract explicit -->
+<!-- Quality: 9/10 — layout/boundaries crisp; module tree can drift from disk -->
 
 # MyChat modularity
 
@@ -40,7 +40,7 @@ memory/rag_store.py chunk → embed → retrieve
 
 ## Module headers
 
-Every JS/CSS/Python module starts with a short **Intent** + **Architecture** + **Quality: N/10 — note** block (see Boy Scout rule). Update Quality whenever you edit the file.
+Every JS/CSS/Python module starts with a short **Intent** + **Architecture** block. **Quality: N/10** is written by the Boy Scout **scoring sub-agent** at the end of each edit batch (see `mychat-boyscout.mdc`) — not invented by the editing agent.
 
 ## ❌ Avoid
 
