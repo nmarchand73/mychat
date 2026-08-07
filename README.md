@@ -1,4 +1,4 @@
-<!-- Quality: 8/10 — product+arch+API solid; no screenshots or troubleshooting -->
+<!-- Quality: 8/10 — 4b/9b picker documented; no troubleshooting or screenshots -->
 # MyChat
 
 Local chat UI for [Ollama](https://ollama.com) — chat, web search, image generation, and a layered memory stack. Everything runs on your machine; no cloud accounts.
@@ -19,13 +19,14 @@ Local chat UI for [Ollama](https://ollama.com) — chat, web search, image gener
 |------|--------|--------|
 | Chat (default) | `ministral-3:8b` | Fast everyday chat |
 | Chat + Think | `qwen3.5:9b` | Only model that gets `think: true` |
-| Images | `x/flux2-klein:4b` | Generate / refine |
+| Images | `x/flux2-klein:4b` / `:9b` | Generate / refine (pick in Settings) |
 | RAG embeddings | `nomic-embed-text` | Local note retrieval |
 
 ```bash
 ollama pull ministral-3:8b
 ollama pull qwen3.5:9b
 ollama pull x/flux2-klein:4b
+ollama pull x/flux2-klein:9b
 ollama pull nomic-embed-text
 ```
 
@@ -45,6 +46,24 @@ pip install -r requirements.txt
 ```
 
 Open **http://127.0.0.1:8765**
+
+### Desktop app (macOS)
+
+Build a double-clickable **MyChat.app** (embeds UI + a private venv so Finder isn’t blocked by Documents privacy):
+
+```bash
+chmod +x scripts/build_macos_app.sh
+./scripts/build_macos_app.sh
+open dist/MyChat.app
+```
+
+Optional: drag `dist/MyChat.app` into **Applications**. Icon: `assets/icon-1024.png`. Logs: `~/Library/Logs/MyChat.log`. Ollama must still be running for chat/images/RAG. Rebuild after code changes so the bundle stays in sync.
+
+Dev window without rebuilding the `.app`:
+
+```bash
+.venv/bin/python desktop_app.py
+```
 
 ---
 
@@ -85,7 +104,9 @@ Browser (index.html)
      └── memory/          conversation · facts · summarizer · rag · orchestrator
 
 serve.py                  static files + /api/search + /api/rag/* + /api/health
+desktop_app.py            pywebview shell over serve.py
 memory/rag_store.py       chunk → embed (Ollama) → cosine retrieve
+scripts/build_macos_app.sh → dist/MyChat.app (+ favicons from icon)
 ```
 
 **Separation of concerns**

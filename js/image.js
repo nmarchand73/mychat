@@ -2,6 +2,7 @@
  * Intent: generate or refine images via Ollama Flux (`/api/generate`).
  * Architecture: factory `createImageRunner(deps)` — posts prompt (+ optional
  * reference image), then asks UI to show the bubble and update lastImage.
+ * Quality: 8/10 — getImageModel dep wired; fixed 512² unrelated to picker
  */
 
 import { OLLAMA, IMAGE_MODEL } from "./config.js";
@@ -14,6 +15,7 @@ import { isAbortError, StoppedError } from "./util.js";
  *   setLastImage: (b64: string) => void,
  *   clearRefineArmed: () => void,
  *   updateRefineBanner: Function,
+ *   getImageModel?: () => string,
  * }} deps
  */
 export function createImageRunner(deps) {
@@ -23,19 +25,21 @@ export function createImageRunner(deps) {
     setLastImage,
     clearRefineArmed,
     updateRefineBanner,
+    getImageModel = () => IMAGE_MODEL,
   } = deps;
 
   async function runImage(prompt, { sourceB64 = null, signal = undefined } = {}) {
+    const model = getImageModel() || IMAGE_MODEL;
     const refining = Boolean(sourceB64);
     addBubble(
       "system",
       refining
-        ? `Varying with ${IMAGE_MODEL} (reference sent; Ollama may still reinvent the scene)…`
-        : `Generating with ${IMAGE_MODEL}…`
+        ? `Varying with ${model} (reference sent; Ollama may still reinvent the scene)…`
+        : `Generating with ${model}…`
     );
 
     const payload = {
-      model: IMAGE_MODEL,
+      model,
       prompt,
       stream: false,
       width: 512,
@@ -75,7 +79,7 @@ export function createImageRunner(deps) {
     addImageBubble({
       prompt,
       b64: data.image,
-      label: refining ? `${IMAGE_MODEL} · refined` : IMAGE_MODEL,
+      label: refining ? `${model} · refined` : model,
     });
   }
 

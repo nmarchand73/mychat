@@ -2,15 +2,17 @@
  * Intent: boot the UI, own mutable app state, wire user events.
  * Architecture: composition root — imports factories (ui/chat/image/session/memory)
  * and holds mode/busy/session flags; no heavy chat/image logic lives here.
- * Quality: 7/10 — regenerate/export wired; form submit still a long handler
+ * Quality: 7/10 — image picker mirrors chat model; composition root still monolithic
  */
 
 import { createMemorySystem } from "./memory/orchestrator.js";
 import {
   OLLAMA,
   CHAT_MODELS,
+  IMAGE_MODELS,
   THINK_MODELS,
   CHAT_MODEL_KEY,
+  IMAGE_MODEL_KEY,
   THINK_KEY,
   SEARCH_KEY,
   FONT_SIZE_KEY,
@@ -32,6 +34,7 @@ const promptEl = document.getElementById("prompt");
 const sendBtn = document.getElementById("send");
 const stopBtn = document.getElementById("stop");
 const chatModelEl = document.getElementById("chatModel");
+const imageModelEl = document.getElementById("imageModel");
 const thinkToggleEl = document.getElementById("thinkToggle");
 const thinkToggleLabel = document.getElementById("thinkToggleLabel");
 const searchToggleEl = document.getElementById("searchToggle");
@@ -88,6 +91,16 @@ function loadChatModel() {
   return CHAT_MODELS[0];
 }
 
+function loadImageModel() {
+  try {
+    const saved = localStorage.getItem(IMAGE_MODEL_KEY);
+    if (IMAGE_MODELS.includes(saved)) return saved;
+  } catch {
+    /* ignore */
+  }
+  return IMAGE_MODELS[0];
+}
+
 function loadThinkEnabled() {
   try {
     const saved = localStorage.getItem(THINK_KEY);
@@ -131,6 +144,8 @@ function applyFontSize(size) {
 
 let chatModel = loadChatModel();
 chatModelEl.value = chatModel;
+let imageModel = loadImageModel();
+if (imageModelEl) imageModelEl.value = imageModel;
 let thinkEnabled = loadThinkEnabled();
 thinkToggleEl.checked = thinkEnabled;
 thinkToggleLabel.classList.toggle("on", thinkEnabled);
@@ -201,6 +216,10 @@ const {
 
 function getChatModel() {
   return chatModel;
+}
+
+function getImageModel() {
+  return imageModel;
 }
 
 function modelSupportsThink(model = getChatModel()) {
@@ -575,6 +594,7 @@ function setBusy(on) {
   stopBtn.classList.toggle("on", on);
   stopBtn.disabled = !on;
   chatModelEl.disabled = on;
+  if (imageModelEl) imageModelEl.disabled = on;
   thinkToggleEl.disabled = on || !modelSupportsThink();
   searchToggleEl.disabled = on;
   if (clearChatBtn) clearChatBtn.disabled = on;
@@ -666,6 +686,7 @@ const image = createImageRunner({
     refineArmed = false;
   },
   updateRefineBanner: () => updateRefineBanner({ refineArmed, lastImageB64 }),
+  getImageModel,
 });
 
 async function runUserTurn(prompt, { skipUserBubble = false } = {}) {
@@ -801,6 +822,18 @@ chatModelEl.addEventListener("change", () => {
       : ""
     : " · Think unavailable";
   setStatus(`Chat model → ${chatModel}${thinkNote}`, "ok");
+});
+
+imageModelEl?.addEventListener("change", () => {
+  const next = imageModelEl.value;
+  if (!IMAGE_MODELS.includes(next)) return;
+  imageModel = next;
+  try {
+    localStorage.setItem(IMAGE_MODEL_KEY, imageModel);
+  } catch {
+    /* ignore */
+  }
+  setStatus(`Image model → ${imageModel}`, "ok");
 });
 
 thinkToggleEl.addEventListener("change", () => {

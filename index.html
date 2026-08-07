@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MyChat</title>
-  <!-- Quality: 8/10 — shell/sidebar clear; empty state now guided -->
+  <!-- Quality: 8/10 — chat+image model selects grouped at top of Settings; options still duplicate config.js -->
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -64,11 +66,20 @@
               <summary>Settings</summary>
               <div class="settings-panel">
                 <div class="settings-row">
-                  <label class="field" for="chatModel">Model</label>
+                  <label class="field" for="chatModel">Chat model</label>
                   <div class="meta" id="meta">
                     <select id="chatModel" aria-label="Chat model">
                       <option value="ministral-3:8b">ministral-3:8b</option>
                       <option value="qwen3.5:9b">qwen3.5:9b</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="settings-row">
+                  <label class="field" for="imageModel">Image model</label>
+                  <div class="meta">
+                    <select id="imageModel" aria-label="Image model">
+                      <option value="x/flux2-klein:4b">flux2-klein:4b (fast)</option>
+                      <option value="x/flux2-klein:9b">flux2-klein:9b (quality)</option>
                     </select>
                   </div>
                 </div>
@@ -133,7 +144,6 @@
                   <button type="button" class="ghost" id="ragIngestBtn">Embed into local RAG</button>
                   <p class="hint" id="ragStatus">RAG: checking…</p>
                 </div>
-                <p class="hint">Image model: <strong style="color:var(--ink);font-weight:500">flux2-klein:4b</strong></p>
                 <button type="button" class="ghost" id="exportChat" title="Download this chat as Markdown">Export chat (.md)</button>
                 <button type="button" class="ghost" id="clearChat" title="Clear this chat’s messages">Clear this chat</button>
               </div>

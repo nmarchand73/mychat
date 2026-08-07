@@ -1,6 +1,7 @@
 /**
  * Intent: single source of truth for URLs, keys, models, tools, intent regexes.
  * Architecture: pure exports — no DOM, no I/O; imported by app/chat/image/intent.
+ * Quality: 9/10 — IMAGE_MODELS/IMAGE_MODEL_KEY mirror chat; single source of truth
  */
 
 export const OLLAMA = "http://127.0.0.1:11434";
@@ -10,8 +11,11 @@ export function getSearchApi() {
 export const CHAT_MODELS = ["ministral-3:8b", "qwen3.5:9b"];
 /** Models that accept Ollama `think: true` */
 export const THINK_MODELS = ["qwen3.5:9b"];
-export const IMAGE_MODEL = "x/flux2-klein:4b";
+/** Flux image models (Ollama `x/flux2-klein`); 4B default, 9B higher quality */
+export const IMAGE_MODELS = ["x/flux2-klein:4b", "x/flux2-klein:9b"];
+export const IMAGE_MODEL = IMAGE_MODELS[0];
 export const CHAT_MODEL_KEY = "mychat.chatModel";
+export const IMAGE_MODEL_KEY = "mychat.imageModel";
 export const THINK_KEY = "mychat.think";
 export const SEARCH_KEY = "mychat.search";
 export const FONT_SIZE_KEY = "mychat.fontSize";

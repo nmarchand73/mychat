@@ -3,6 +3,7 @@
 Intent: serve the static MyChat UI plus local APIs (search + RAG).
 Architecture: ThreadingHTTPServer from ROOT; /api/search (ddgs), /api/rag/*
 and /api/health; everything else is static files with no-store caching.
+Quality: 7/10 — make_server() clean; repeated rag imports + broad except per route
 """
 
 from __future__ import annotations
@@ -101,10 +102,11 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 from memory import rag_store
 
-                self._json(200, rag_store.list_chunks())
+                self._json(200, {"chunks": rag_store.list_chunks()})
             except Exception as e:  # noqa: BLE001
-                self._json(500, {"error": str(e)})
+                self._json(500, {"error": str(e), "chunks": []})
             return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -115,48 +117,44 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 body = _read_json_body(self)
             except ValueError:
-                self._json(400, {"error": "invalid JSON"})
+                self._json(400, {"error": "invalid JSON", "results": []})
                 return
-            query = body.get("query") or body.get("q") or ""
-            max_results = body.get("max_results") or 5
-            self._run_search(query, max_results)
+            self._run_search(body.get("query") or "", int(body.get("max_results") or 5))
             return
-
         if path == "/api/rag/ingest":
             try:
                 body = _read_json_body(self)
                 from memory import rag_store
 
-                result = rag_store.ingest(
-                    text=body.get("text") or "",
-                    source=body.get("source") or "manual",
+                self._json(
+                    200,
+                    rag_store.ingest(
+                        body.get("text") or "",
+                        source=body.get("source") or "ui",
+                    ),
                 )
-                status = 200 if result.get("ok") else 400
-                self._json(status, result)
-            except urllib.error.URLError as e:
-                self._json(503, {"ok": False, "error": f"Ollama embed failed: {e}"})
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
-                self._json(500, {"ok": False, "error": str(e)})
+                self._json(500, {"error": str(e)})
             return
-
         if path == "/api/rag/query":
             try:
                 body = _read_json_body(self)
                 from memory import rag_store
 
-                result = rag_store.query(
-                    q=body.get("query") or body.get("q") or "",
-                    top_k=body.get("top_k") or body.get("topK") or 4,
+                self._json(
+                    200,
+                    {
+                        "hits": rag_store.query(
+                            body.get("query") or "",
+                            top_k=int(body.get("top_k") or 5),
+                        )
+                    },
                 )
-                self._json(200, result)
-            except urllib.error.URLError as e:
-                self._json(503, {"hits": [], "error": f"Ollama embed failed: {e}"})
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
-                self._json(500, {"hits": [], "error": str(e)})
+                self._json(500, {"error": str(e), "hits": []})
             return
-
         self.send_error(404)
 
     def do_DELETE(self):
@@ -164,9 +162,6 @@ class Handler(SimpleHTTPRequestHandler):
         path = parsed.path
         if path.startswith("/api/rag/"):
             chunk_id = path[len("/api/rag/") :].strip("/")
-            if not chunk_id or chunk_id in {"ingest", "query", "list", "health"}:
-                self._json(400, {"error": "missing chunk id"})
-                return
             try:
                 from memory import rag_store
 
@@ -202,10 +197,18 @@ class Handler(SimpleHTTPRequestHandler):
         print(f"[mychat] {self.address_string()} {fmt % args}")
 
 
-if __name__ == "__main__":
+def make_server(host: str = "127.0.0.1", port: int = PORT) -> ThreadingHTTPServer:
     ThreadingHTTPServer.allow_reuse_address = True
-    with ThreadingHTTPServer(("127.0.0.1", PORT), Handler) as httpd:
+    return ThreadingHTTPServer((host, port), Handler)
+
+
+def main() -> None:
+    with make_server() as httpd:
         print(f"MyChat → http://127.0.0.1:{PORT}")
         print("Local search: ddgs · Local RAG: /api/rag/* (nomic-embed-text)")
         print("Keep Ollama running (image gen needs 0.32.5)")
         httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
