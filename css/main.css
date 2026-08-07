@@ -1,9 +1,10 @@
 /**
  * Intent: load all MyChat styles from one entry.
- * Architecture: CSS layers by UI region — tokens → base → topbar/settings/chat/composer/animations.
+ * Architecture: CSS layers by UI region — tokens → base → sidebar/topbar/settings/chat/composer/animations.
  */
 @import url('./tokens.css');
 @import url('./base.css');
+@import url('./sidebar.css');
 @import url('./topbar.css');
 @import url('./settings.css');
 @import url('./chat.css');

@@ -2,6 +2,7 @@
  * Intent: run one chat turn end-to-end (memory prep → tools → stream answer).
  * Architecture: factory `createChatRunner(deps)` closes over UI/memory callbacks;
  * talks to Ollama `/api/chat` and local `/api/search`; does not own DOM state.
+ * Quality: 7/10 — pipeline clear; runChat still long, tools now sibling+persisted
  */
 
 import {
@@ -99,7 +100,11 @@ export function createChatRunner(deps) {
   async function runChat(prompt, signal) {
     const checkpoint = memory.conversation.checkpoint();
     memory.conversation.pushUser(prompt);
-    const bot = addBubble("bot", "", { label: getChatModel(), persist: false });
+    const bot = addBubble("bot", "", {
+      label: getChatModel(),
+      persist: false,
+      historyBefore: memory.conversation.length,
+    });
     const wantThink = getThinkEnabled();
     const wantSearch = getSearchEnabled();
     const thought = wantThink ? createThoughtBlock() : null;
@@ -249,7 +254,7 @@ export function createChatRunner(deps) {
             const card = createToolUseCard({
               name: "web_search",
               input: { query, max_results: maxResults },
-              beforeEl: body,
+              beforeEl: bot,
             });
             setStatus(`Searching: ${query}`, "busy");
             setWorkingPhase(body, "Waiting for search results…");
@@ -383,7 +388,16 @@ export function createChatRunner(deps) {
       setMarkdown(body, answer);
       scrollThreadToBottom();
       memory.conversation.pushAssistant(answer);
-      recordThread({ t: "bot", c: answer, label: getChatModel(), md: true }, bot);
+      recordThread(
+        {
+          t: "bot",
+          c: answer,
+          label: getChatModel(),
+          md: true,
+          historyBefore: Number(bot.dataset.historyBefore) || 0,
+        },
+        bot
+      );
       persistSession();
     } catch (err) {
       if (isAbortError(err)) {
@@ -402,6 +416,7 @@ export function createChatRunner(deps) {
               c: `${answer}\n\n_(stopped)_`,
               label: getChatModel(),
               md: true,
+              historyBefore: Number(bot.dataset.historyBefore) || 0,
             },
             bot
           );

@@ -3,6 +3,8 @@ description: MyChat modularity — keep thin modules, composition root, and clea
 alwaysApply: true
 ---
 
+<!-- Quality: 9/10 — layout includes export.js; Quality header contract explicit -->
+
 # MyChat modularity
 
 Preserve the current layout. Do not collapse back into a monolithic `index.html` or a single mega `app.js`.
@@ -10,14 +12,15 @@ Preserve the current layout. Do not collapse back into a monolithic `index.html`
 ## Layout
 
 ```
-index.html          markup only (no inline CSS/JS logic)
-css/main.css        @imports by region (tokens → base → topbar/settings/chat/composer/animations)
+index.html          markup only — .shell > sidebar + .workspace (topbar/stage/dock)
+css/main.css        @imports by region (tokens → base → sidebar → topbar/settings/chat/composer/animations)
 js/app.js           composition root: DOM refs, mutable state, event listeners, wiring
-js/config.js        constants, models, tools, regexes — no DOM, no I/O
+js/config.js        constants, models, keys, tools, regexes — no DOM, no I/O
 js/chat.js          chat turn pipeline (Ollama + tools + stream)
 js/image.js         Flux generate / refine
 js/ui.js            DOM helpers (bubbles, cards, banners, status)
-js/session.js       localStorage persist / restore
+js/session.js       multi-chat library (v3 localStorage) + active thread persist/restore
+js/export.js        thread → Markdown download
 js/intent.js        Auto → chat | image | refine
 js/markdown.js      think tags + safe Markdown (links open in new tab)
 js/util.js          StoppedError, abort detection, escapeHtml
@@ -29,13 +32,15 @@ memory/rag_store.py chunk → embed → retrieve
 ## Boundaries
 
 - **UI transcript** (`threadLog`) ≠ **model history** (`memory/conversation`). Keep both.
+- **Chat library** ≠ single session: `session.js` owns `{ activeId, chats[] }`; migrate v1/v2 on load.
+- Facts & RAG are global across chats; clearing/deleting a chat must not wipe them.
 - Pipelines take **injected deps** / factories (`createUi`, `createChatRunner`, …). Do not reach into `app.js` globals from leaf modules.
 - Browser talks to Ollama directly; `serve.py` only serves files + search + RAG.
 - Put new feature code in the owning module; grow `app.js` only for state + wiring.
 
 ## Module headers
 
-Every JS/CSS/Python module starts with a short **Intent** + **Architecture** comment block.
+Every JS/CSS/Python module starts with a short **Intent** + **Architecture** + **Quality: N/10 — note** block (see Boy Scout rule). Update Quality whenever you edit the file.
 
 ## ❌ Avoid
 

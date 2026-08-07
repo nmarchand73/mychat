@@ -17,7 +17,9 @@ export const SEARCH_KEY = "mychat.search";
 export const FONT_SIZE_KEY = "mychat.fontSize";
 export const FONT_SIZES = ["sm", "md", "lg", "xl"];
 export const SESSION_KEY = "mychat.session";
-export const SESSION_VERSION = 2;
+/** v3 = multi-chat library; v1/v2 single-session payloads are migrated on load */
+export const SESSION_VERSION = 3;
+export const SIDEBAR_COLLAPSED_KEY = "mychat.sidebarCollapsed";
 export const MAX_TOOL_ROUNDS = 3;
 
 export const WEB_SEARCH_TOOL = {

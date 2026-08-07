@@ -1,7 +1,8 @@
 /**
  * Intent: build thread DOM (bubbles, tool cards, banners, status, scroll).
- * Architecture: factory `createUi(deps)` returns helpers; persistence/edit
- * callbacks are injected so this module stays presentation-only.
+ * Architecture: factory `createUi(deps)` returns helpers; persistence / edit /
+ * delete / regenerate callbacks stay injected — presentation only.
+ * Quality: 8/10 — tool restore + regenerate; streaming bot shell still special-cased
  */
 
 import { renderMarkdown, setWorkingPhase } from "./markdown.js";
@@ -21,6 +22,8 @@ import { escapeHtml } from "./util.js";
  *   getHistoryLength: () => number,
  *   recordThread: (entry: object, el?: HTMLElement) => number,
  *   onEditUserBubble: (el: HTMLElement) => void,
+ *   onDeleteFromBubble: (el: HTMLElement) => void,
+ *   onRegenerateBubble?: (el: HTMLElement) => void,
  *   setLastImage: (b64: string) => void,
  *   armRefine: () => void,
  * }} deps
@@ -39,9 +42,48 @@ export function createUi(deps) {
     getHistoryLength,
     recordThread,
     onEditUserBubble,
+    onDeleteFromBubble,
+    onRegenerateBubble,
     setLastImage,
     armRefine,
   } = deps;
+
+  function attachMsgActions(el, { edit = false, regenerate = false } = {}) {
+    const actions = document.createElement("div");
+    actions.className = "msg-actions";
+    if (edit) {
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onEditUserBubble(el);
+      });
+      actions.appendChild(editBtn);
+    }
+    if (regenerate && typeof onRegenerateBubble === "function") {
+      const regenBtn = document.createElement("button");
+      regenBtn.type = "button";
+      regenBtn.textContent = "Regenerate";
+      regenBtn.title = "Redo from the previous user message";
+      regenBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onRegenerateBubble(el);
+      });
+      actions.appendChild(regenBtn);
+    }
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "danger";
+    delBtn.textContent = "Delete";
+    delBtn.title = "Delete this and everything after";
+    delBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onDeleteFromBubble(el);
+    });
+    actions.appendChild(delBtn);
+    el.appendChild(actions);
+  }
 
   function isThreadNearBottom(px = 96) {
     return thread.scrollHeight - thread.scrollTop - thread.clientHeight <= px;
@@ -91,6 +133,9 @@ export function createUi(deps) {
     clearEmpty();
     const el = document.createElement("div");
     el.className = `bubble ${role}`;
+    if (historyBefore != null) {
+      el.dataset.historyBefore = String(Number(historyBefore));
+    }
     if (label) {
       const lab = document.createElement("span");
       lab.className = "label";
@@ -108,17 +153,7 @@ export function createUi(deps) {
       text.textContent = content;
       el.appendChild(text);
 
-      const actions = document.createElement("div");
-      actions.className = "msg-actions";
-      const editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.textContent = "Edit";
-      editBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        onEditUserBubble(el);
-      });
-      actions.appendChild(editBtn);
-      el.appendChild(actions);
+      attachMsgActions(el, { edit: true });
 
       el.title = "Double-click to edit";
       el.addEventListener("dblclick", () => onEditUserBubble(el));
@@ -126,19 +161,35 @@ export function createUi(deps) {
         recordThread({ t: "user", c: content, historyBefore: before }, el);
       }
     } else if (md) {
+      const before =
+        historyBefore != null ? Number(historyBefore) : getHistoryLength();
+      el.dataset.historyBefore = String(before);
       const body = document.createElement("div");
       body.className = "md";
       body.innerHTML = renderMarkdown(content);
       el.appendChild(body);
+      attachMsgActions(el, { regenerate: true });
       if (persist) {
-        recordThread({ t: "bot", c: content, label, md: true }, el);
+        recordThread(
+          { t: "bot", c: content, label, md: true, historyBefore: before },
+          el
+        );
       }
     } else if (html) {
       el.insertAdjacentHTML("beforeend", content);
     } else {
-      el.appendChild(document.createTextNode(content));
+      if (content) el.appendChild(document.createTextNode(content));
+      const before =
+        historyBefore != null ? Number(historyBefore) : getHistoryLength();
+      el.dataset.historyBefore = String(before);
+      if (role === "bot" || role === "system") {
+        attachMsgActions(el, { regenerate: role === "bot" });
+      }
       if (persist && role === "system") {
-        recordThread({ t: "system", c: content }, el);
+        recordThread(
+          { t: "system", c: content, historyBefore: before },
+          el
+        );
       }
     }
 
@@ -148,8 +199,13 @@ export function createUi(deps) {
   }
 
   function addImageBubble({ prompt, b64, label, persist = true }) {
+    const before = getHistoryLength();
     const src = b64 ? `data:image/png;base64,${b64}` : "";
-    const bot = addBubble("bot", "", { label, persist: false });
+    const bot = addBubble("bot", "", {
+      label,
+      persist: false,
+      historyBefore: before,
+    });
     if (b64) {
       const img = document.createElement("img");
       img.src = src;
@@ -188,10 +244,19 @@ export function createUi(deps) {
 
     if (persist) {
       recordThread(
-        { t: "image", prompt, label, img: b64 || null, missing: !b64 },
+        {
+          t: "image",
+          prompt,
+          label,
+          img: b64 || null,
+          missing: !b64,
+          historyBefore: Number(bot.dataset.historyBefore) || before,
+        },
         bot
       );
     }
+    const actionBar = bot.querySelector(".msg-actions");
+    if (actionBar) bot.appendChild(actionBar);
     scrollThreadToBottom(true);
     return bot;
   }
@@ -249,7 +314,14 @@ export function createUi(deps) {
     };
   }
 
-  function createToolUseCard({ name, input, beforeEl }) {
+  function createToolUseCard({
+    name,
+    input,
+    beforeEl,
+    persist = true,
+    restored = null,
+  }) {
+    let shouldPersist = Boolean(persist) && !restored;
     const details = document.createElement("details");
     details.className = "tool-use running";
 
@@ -301,7 +373,7 @@ export function createUi(deps) {
     else thread.appendChild(details);
     scrollThreadToBottom();
 
-    return {
+    const card = {
       el: details,
       setRunning() {
         details.classList.remove("done", "error");
@@ -321,21 +393,34 @@ export function createUi(deps) {
         resultsEl.innerHTML = "";
         if (!n) {
           resultsEl.innerHTML = `<div class="tool-empty">No results found.</div>`;
-          scrollThreadToBottom();
-          return;
+        } else {
+          for (const r of results) {
+            const item = document.createElement("div");
+            item.className = "tool-result";
+            const title = escapeHtml(r.title || r.url || "Result");
+            const url = escapeHtml(r.url || "");
+            const snippet = escapeHtml(r.snippet || "");
+            item.innerHTML = `
+              <a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>
+              <div class="url">${url}</div>
+              ${snippet ? `<div class="snippet">${snippet}</div>` : ""}
+            `;
+            resultsEl.appendChild(item);
+          }
         }
-        for (const r of results) {
-          const item = document.createElement("div");
-          item.className = "tool-result";
-          const title = escapeHtml(r.title || r.url || "Result");
-          const url = escapeHtml(r.url || "");
-          const snippet = escapeHtml(r.snippet || "");
-          item.innerHTML = `
-            <a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>
-            <div class="url">${url}</div>
-            ${snippet ? `<div class="snippet">${snippet}</div>` : ""}
-          `;
-          resultsEl.appendChild(item);
+        if (shouldPersist && !details.dataset.threadIndex) {
+          recordThread(
+            {
+              t: "tool",
+              name,
+              input,
+              results: Array.isArray(results) ? results : [],
+              status: "done",
+              historyBefore: getHistoryLength(),
+            },
+            details
+          );
+          shouldPersist = false;
         }
         scrollThreadToBottom();
       },
@@ -348,8 +433,41 @@ export function createUi(deps) {
         resultsEl.innerHTML = `<div class="tool-error-text">${escapeHtml(
           message || "Tool failed"
         )}</div>`;
+        if (shouldPersist && !details.dataset.threadIndex) {
+          recordThread(
+            {
+              t: "tool",
+              name,
+              input,
+              results: [],
+              status: "error",
+              error: String(message || "Tool failed"),
+              historyBefore: getHistoryLength(),
+            },
+            details
+          );
+          shouldPersist = false;
+        }
       },
     };
+
+    if (restored?.status === "error") {
+      card.setError(restored.error || "Tool failed");
+    } else if (restored) {
+      card.setDone(restored.results || []);
+    }
+
+    return card;
+  }
+
+  function restoreToolCard(item) {
+    return createToolUseCard({
+      name: item.name || "tool",
+      input: item.input || {},
+      beforeEl: null,
+      persist: false,
+      restored: item,
+    });
   }
 
   return {
@@ -363,6 +481,7 @@ export function createUi(deps) {
     addImageBubble,
     createMemoryCompactCard,
     createToolUseCard,
+    restoreToolCard,
     setWorkingPhase,
   };
 }

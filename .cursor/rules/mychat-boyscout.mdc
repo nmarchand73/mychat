@@ -1,0 +1,73 @@
+---
+description: Boy Scout rule — leave every touched file better and raise its quality score
+alwaysApply: true
+---
+
+<!-- Quality: 9/10 — clear score contract + scale; could add one concrete before/after example -->
+
+# Boy Scout rule
+
+**Each time you create or modify a file, leave it better than you found it**, and **record / raise a code-quality score in that file’s header**.
+
+## Quality score (required on every create / edit)
+
+At the end of your change to a file, ensure its header includes a **Quality** line:
+
+```text
+Quality: N/10 — short note (what holds the score back, or why it’s strong)
+```
+
+### Where it lives
+
+| Kind | Placement |
+|------|-----------|
+| JS / CSS / Python | In the top module comment, after Intent / Architecture |
+| HTML | HTML comment near the top of `<body>` or after `<!DOCTYPE>` |
+| Cursor `.mdc` rules | HTML comment immediately after the YAML frontmatter |
+
+Example (JS):
+
+```js
+/**
+ * Intent: …
+ * Architecture: …
+ * Quality: 7/10 — clear facade; createChat still a bit long
+ */
+```
+
+### Scale (be honest)
+
+| Score | Meaning |
+|------|---------|
+| 1–3 | Hard to follow, mixed concerns, or dangerous edges |
+| 4–5 | Works but messy / oversized / weak boundaries |
+| 6–7 | Solid and readable; a few concrete smells remain |
+| 8–9 | Clean, focused, easy to change; minor nits only |
+| 10 | Reserved — essentially nothing useful left to improve in-file |
+
+If the file had **no** score yet, **add one** (first estimate after your edit).  
+If it already had a score, **try to improve it by ≥1** via a real local cleanup in the same edit (not by inflating the number). If you cannot raise it this pass, keep the score and update the note with what still blocks a higher mark.
+
+## Boy Scout cleanup (required)
+
+On every touched file, also do **one** nearby improvement, for example:
+
+- Remove dead code / obsolete comments
+- Fix a misleading name next to your change
+- Refresh Intent / Architecture if the role shifted
+- Dedupe a helper you just had to touch
+- Drop an unused import
+- Split or extract only if it clearly raises the Quality score without widening scope
+
+## Limits
+
+- Only files required for the task — no repo-wide score campaigns.
+- Do not bump the score without a real improvement.
+- Do not expand into unrelated refactors or formatting-only diffs.
+- Prefer the smallest change that raises clarity or the score.
+
+## ❌ Avoid
+
+- “I’ll score / clean it later” on a file you already edited
+- Raising `Quality` while leaving known dead code in that file
+- Deleting tests or weakening contracts to “simplify”

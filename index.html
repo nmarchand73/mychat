@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MyChat</title>
+  <!-- Quality: 8/10 — shell/sidebar clear; empty state now guided -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -11,140 +12,186 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 </head>
-<body>
+<body data-sidebar="open">
   <div class="app">
-    <!-- Top bar: brand + modes + settings -->
-    <header class="topbar">
-      <h1 class="brand">My<span>Chat</span></h1>
-      <div class="top-controls">
-        <div class="modes" role="group" aria-label="Mode">
-          <button type="button" data-mode="auto" aria-pressed="true">Auto</button>
-          <button type="button" data-mode="chat" aria-pressed="false">Chat</button>
-          <button type="button" data-mode="image" aria-pressed="false">Image</button>
-        </div>
-        <details class="settings" id="settings">
-          <summary>Settings</summary>
-          <div class="settings-panel">
-            <div class="settings-row">
-              <label class="field" for="chatModel">Model</label>
-              <div class="meta" id="meta">
-                <select id="chatModel" aria-label="Chat model">
-                  <option value="ministral-3:8b">ministral-3:8b</option>
-                  <option value="qwen3.5:9b">qwen3.5:9b</option>
-                </select>
-              </div>
+    <div class="shell">
+      <!-- Chat library -->
+      <aside class="sidebar" id="sidebar" aria-label="Chats">
+        <div class="sidebar-inner">
+          <div class="sidebar-head">
+            <div class="sidebar-head-row">
+              <p class="sidebar-brand">My<span>Chat</span></p>
+              <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Close sidebar" title="Close sidebar">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="5" width="8" height="14" rx="1.5" />
+                  <path d="M14 8l4 4-4 4" />
+                </svg>
+              </button>
             </div>
-            <div class="settings-row">
-              <span class="field">Text size</span>
-              <div class="font-size-picks" id="fontSizePicks" role="group" aria-label="Text size">
-                <button type="button" data-font-size="sm" title="Small">A−</button>
-                <button type="button" data-font-size="md" title="Medium" aria-pressed="true">A</button>
-                <button type="button" data-font-size="lg" title="Large">A+</button>
-                <button type="button" data-font-size="xl" title="Extra large">A++</button>
-              </div>
-            </div>
-            <div class="settings-row">
-              <span>Think</span>
-              <label class="toggle" id="thinkToggleLabel" title="Show model reasoning before the answer">
-                <input type="checkbox" id="thinkToggle" />
-              </label>
-            </div>
-            <div class="settings-row">
-              <span>Web search</span>
-              <label class="toggle" id="searchToggleLabel" title="Allow the model to search the web via local DuckDuckGo (ddgs)">
-                <input type="checkbox" id="searchToggle" />
-              </label>
-            </div>
-            <hr class="settings-sep" />
-            <p class="hint" style="margin:0"><strong style="color:var(--ink);font-weight:600">Memory</strong></p>
-            <div class="settings-row">
-              <span>Facts in prompt</span>
-              <label class="toggle" id="factsToggleLabel" title="Inject durable facts into the system prompt">
-                <input type="checkbox" id="factsToggle" />
-              </label>
-            </div>
-            <div class="settings-row">
-              <span>Local RAG</span>
-              <label class="toggle" id="ragToggleLabel" title="Retrieve notes from local embeddings (nomic-embed-text)">
-                <input type="checkbox" id="ragToggle" />
-              </label>
-            </div>
-            <div class="settings-row">
-              <span>Auto-summarize</span>
-              <label class="toggle" id="summarizeToggleLabel" title="Compress old turns when context grows">
-                <input type="checkbox" id="summarizeToggle" />
-              </label>
-            </div>
-            <div class="settings-row">
-              <span>remember_fact tool</span>
-              <label class="toggle" id="rememberToolToggleLabel" title="Let the model store durable facts via a tool">
-                <input type="checkbox" id="rememberToolToggle" />
-              </label>
-            </div>
-            <div class="memory-box">
-              <label class="field" for="factInput">Add fact</label>
-              <div class="memory-add">
-                <input id="factInput" type="text" placeholder="e.g. Prefers French answers" />
-                <button type="button" class="ghost tight" id="addFactBtn">Add</button>
-              </div>
-              <ul class="fact-list" id="factList"></ul>
-            </div>
-            <div class="memory-box">
-              <label class="field" for="ragInput">Ingest note (RAG)</label>
-              <textarea id="ragInput" rows="3" placeholder="Paste notes, docs, preferences…"></textarea>
-              <button type="button" class="ghost" id="ragIngestBtn">Embed into local RAG</button>
-              <p class="hint" id="ragStatus">RAG: checking…</p>
-            </div>
-            <p class="hint">Image model: <strong style="color:var(--ink);font-weight:500">flux2-klein:4b</strong></p>
-            <button type="button" class="ghost" id="clearChat" title="Clear conversation history">Clear conversation</button>
-          </div>
-        </details>
-      </div>
-    </header>
-
-    <!-- Conversation -->
-    <div class="stage">
-      <div class="thread" id="thread" aria-live="polite">
-        <div class="empty" id="empty">
-          <strong>How can I help?</strong>
-          Ask a question, search the web, or describe an image to generate.
-        </div>
-      </div>
-    </div>
-
-    <!-- Composer dock -->
-    <div class="dock">
-      <div class="dock-inner">
-        <div class="edit-banner" id="editBanner" aria-live="polite">
-          <span>Editing a previous prompt — send to redo from here</span>
-          <button type="button" id="clearEdit">Cancel</button>
-        </div>
-
-        <div class="refine-banner" id="refineBanner" aria-live="polite">
-          <img id="refineThumb" alt="" />
-          <span id="refineLabel">Refining last image</span>
-          <button type="button" id="clearRefine">Clear</button>
-        </div>
-
-        <form class="composer" id="form">
-          <textarea
-            id="prompt"
-            placeholder="Message MyChat…"
-            rows="1"
-            autofocus
-          ></textarea>
-          <div class="composer-actions">
-            <button class="send" id="send" type="submit" aria-label="Send">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4 3.4 10.2 14.2 12 3.4 13.8z"/></svg>
-            </button>
-            <button class="stop" id="stop" type="button" aria-label="Stop generation">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            <button type="button" class="new-chat" id="newChatBtn">
+              <span class="plus" aria-hidden="true">+</span>
+              New chat
             </button>
           </div>
-        </form>
-        <div class="status">
-          <span class="dot" id="dot" aria-hidden="true"></span>
-          <span id="status">Checking Ollama…</span>
+          <nav class="chat-list" id="chatList" aria-label="Chat threads"></nav>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <button type="button" class="sidebar-backdrop" id="sidebarBackdrop" aria-label="Close sidebar" tabindex="-1"></button>
+        <!-- Top bar: brand + modes + settings -->
+        <header class="topbar">
+          <div class="topbar-left">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Close sidebar" title="Toggle sidebar" aria-controls="sidebar" aria-expanded="true">
+              <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="5" width="8" height="14" rx="1.5" />
+                <path d="M14 8l4 4-4 4" />
+              </svg>
+              <svg class="icon-open" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="5" width="8" height="14" rx="1.5" />
+                <path d="M18 8l-4 4 4 4" />
+              </svg>
+            </button>
+            <h1 class="brand">My<span>Chat</span></h1>
+          </div>
+          <div class="top-controls">
+            <div class="modes" role="group" aria-label="Mode">
+              <button type="button" data-mode="auto" aria-pressed="true">Auto</button>
+              <button type="button" data-mode="chat" aria-pressed="false">Chat</button>
+              <button type="button" data-mode="image" aria-pressed="false">Image</button>
+            </div>
+            <details class="settings" id="settings">
+              <summary>Settings</summary>
+              <div class="settings-panel">
+                <div class="settings-row">
+                  <label class="field" for="chatModel">Model</label>
+                  <div class="meta" id="meta">
+                    <select id="chatModel" aria-label="Chat model">
+                      <option value="ministral-3:8b">ministral-3:8b</option>
+                      <option value="qwen3.5:9b">qwen3.5:9b</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="settings-row">
+                  <span class="field">Text size</span>
+                  <div class="font-size-picks" id="fontSizePicks" role="group" aria-label="Text size">
+                    <button type="button" data-font-size="sm" title="Small">A−</button>
+                    <button type="button" data-font-size="md" title="Medium" aria-pressed="true">A</button>
+                    <button type="button" data-font-size="lg" title="Large">A+</button>
+                    <button type="button" data-font-size="xl" title="Extra large">A++</button>
+                  </div>
+                </div>
+                <div class="settings-row">
+                  <span>Think</span>
+                  <label class="toggle" id="thinkToggleLabel" title="Show model reasoning before the answer">
+                    <input type="checkbox" id="thinkToggle" />
+                  </label>
+                </div>
+                <div class="settings-row">
+                  <span>Web search</span>
+                  <label class="toggle" id="searchToggleLabel" title="Allow the model to search the web via local DuckDuckGo (ddgs)">
+                    <input type="checkbox" id="searchToggle" />
+                  </label>
+                </div>
+                <hr class="settings-sep" />
+                <p class="hint" style="margin:0"><strong style="color:var(--ink);font-weight:600">Memory</strong></p>
+                <div class="settings-row">
+                  <span>Facts in prompt</span>
+                  <label class="toggle" id="factsToggleLabel" title="Inject durable facts into the system prompt">
+                    <input type="checkbox" id="factsToggle" />
+                  </label>
+                </div>
+                <div class="settings-row">
+                  <span>Local RAG</span>
+                  <label class="toggle" id="ragToggleLabel" title="Retrieve notes from local embeddings (nomic-embed-text)">
+                    <input type="checkbox" id="ragToggle" />
+                  </label>
+                </div>
+                <div class="settings-row">
+                  <span>Auto-summarize</span>
+                  <label class="toggle" id="summarizeToggleLabel" title="Compress old turns when context grows">
+                    <input type="checkbox" id="summarizeToggle" />
+                  </label>
+                </div>
+                <div class="settings-row">
+                  <span>remember_fact tool</span>
+                  <label class="toggle" id="rememberToolToggleLabel" title="Let the model store durable facts via a tool">
+                    <input type="checkbox" id="rememberToolToggle" />
+                  </label>
+                </div>
+                <div class="memory-box">
+                  <label class="field" for="factInput">Add fact</label>
+                  <div class="memory-add">
+                    <input id="factInput" type="text" placeholder="e.g. Prefers French answers" />
+                    <button type="button" class="ghost tight" id="addFactBtn">Add</button>
+                  </div>
+                  <ul class="fact-list" id="factList"></ul>
+                </div>
+                <div class="memory-box">
+                  <label class="field" for="ragInput">Ingest note (RAG)</label>
+                  <textarea id="ragInput" rows="3" placeholder="Paste notes, docs, preferences…"></textarea>
+                  <button type="button" class="ghost" id="ragIngestBtn">Embed into local RAG</button>
+                  <p class="hint" id="ragStatus">RAG: checking…</p>
+                </div>
+                <p class="hint">Image model: <strong style="color:var(--ink);font-weight:500">flux2-klein:4b</strong></p>
+                <button type="button" class="ghost" id="exportChat" title="Download this chat as Markdown">Export chat (.md)</button>
+                <button type="button" class="ghost" id="clearChat" title="Clear this chat’s messages">Clear this chat</button>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        <!-- Conversation -->
+        <div class="stage">
+          <div class="thread" id="thread" aria-live="polite">
+            <div class="empty" id="empty">
+              <strong>How can I help?</strong>
+              <p class="empty-lead">Ask a question, search the web, or describe an image to generate.</p>
+              <div class="suggestions" id="suggestions" role="group" aria-label="Suggestions">
+                <button type="button" data-prompt="What are the top AI news stories today?">Search the web</button>
+                <button type="button" data-prompt="Explain how local RAG memory works in simple terms.">Explain something</button>
+                <button type="button" data-prompt="Draw a cozy rainy café window at night, neon reflections on wet pavement">Generate an image</button>
+                <button type="button" data-prompt="Remember that I prefer concise answers in French.">Save a preference</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Composer dock -->
+        <div class="dock">
+          <div class="dock-inner">
+            <div class="edit-banner" id="editBanner" aria-live="polite">
+              <span>Editing a previous prompt — send to redo from here</span>
+              <button type="button" id="clearEdit">Cancel</button>
+            </div>
+
+            <div class="refine-banner" id="refineBanner" aria-live="polite">
+              <img id="refineThumb" alt="" />
+              <span id="refineLabel">Refining last image</span>
+              <button type="button" id="clearRefine">Clear</button>
+            </div>
+
+            <form class="composer" id="form">
+              <textarea
+                id="prompt"
+                placeholder="Message MyChat…"
+                rows="1"
+                autofocus
+              ></textarea>
+              <div class="composer-actions">
+                <button class="send" id="send" type="submit" aria-label="Send">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4 3.4 10.2 14.2 12 3.4 13.8z"/></svg>
+                </button>
+                <button class="stop" id="stop" type="button" aria-label="Stop generation">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                </button>
+              </div>
+            </form>
+            <div class="status">
+              <span class="dot" id="dot" aria-hidden="true"></span>
+              <span id="status">Checking Ollama…</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

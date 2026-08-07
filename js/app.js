@@ -2,6 +2,7 @@
  * Intent: boot the UI, own mutable app state, wire user events.
  * Architecture: composition root — imports factories (ui/chat/image/session/memory)
  * and holds mode/busy/session flags; no heavy chat/image logic lives here.
+ * Quality: 7/10 — regenerate/export wired; form submit still a long handler
  */
 
 import { createMemorySystem } from "./memory/orchestrator.js";
@@ -14,12 +15,14 @@ import {
   SEARCH_KEY,
   FONT_SIZE_KEY,
   FONT_SIZES,
+  SIDEBAR_COLLAPSED_KEY,
 } from "./config.js";
 import { createSessionStore } from "./session.js";
 import { createUi } from "./ui.js";
 import { createChatRunner } from "./chat.js";
 import { createImageRunner } from "./image.js";
 import { resolveMode } from "./intent.js";
+import { threadToMarkdown, downloadText } from "./export.js";
 import { isAbortError, StoppedError } from "./util.js";
 
 const thread = document.getElementById("thread");
@@ -53,6 +56,13 @@ const clearRefineBtn = document.getElementById("clearRefine");
 const editBanner = document.getElementById("editBanner");
 const clearEditBtn = document.getElementById("clearEdit");
 const clearChatBtn = document.getElementById("clearChat");
+const exportChatBtn = document.getElementById("exportChat");
+const suggestionsEl = document.getElementById("suggestions");
+const chatListEl = document.getElementById("chatList");
+const newChatBtn = document.getElementById("newChatBtn");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const sidebarClose = document.getElementById("sidebarClose");
+const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 const modeButtons = [...document.querySelectorAll(".modes button")];
 
 let mode = "auto";
@@ -147,6 +157,17 @@ const session = createSessionStore({
   getLastImage: () => lastImageB64,
 });
 
+function persistSession() {
+  session.persistSession();
+  refreshChatList();
+}
+
+function recordThread(entry, el) {
+  const idx = session.recordThread(entry, el);
+  refreshChatList();
+  return idx;
+}
+
 const ui = createUi({
   thread,
   empty,
@@ -158,8 +179,10 @@ const ui = createUi({
   editBanner,
   promptEl,
   getHistoryLength: () => history.length,
-  recordThread: session.recordThread,
+  recordThread,
   onEditUserBubble: (el) => beginEditUserBubble(el),
+  onDeleteFromBubble: (el) => deleteFromBubble(el),
+  onRegenerateBubble: (el) => regenerateFromBot(el),
   setLastImage,
   armRefine,
 });
@@ -173,6 +196,7 @@ const {
   addImageBubble,
   createMemoryCompactCard,
   createToolUseCard,
+  restoreToolCard,
 } = ui;
 
 function getChatModel() {
@@ -204,6 +228,7 @@ function syncThinkToggleUi() {
 function setLastImage(b64) {
   lastImageB64 = b64;
   session.persistSession();
+  refreshChatList();
 }
 
 function armRefine() {
@@ -220,18 +245,28 @@ function clearEditState() {
   updateEditBanner(editPending);
 }
 
-function truncateFromUserBubble(userEl) {
-  const checkpoint = Number(userEl.dataset.historyBefore || 0);
-  memory.conversation.truncateTo(Math.max(0, checkpoint));
-  const ti = Number(userEl.dataset.threadIndex);
+function truncateFromBubble(el) {
+  const checkpoint = Number(el.dataset.historyBefore);
+  if (Number.isFinite(checkpoint)) {
+    memory.conversation.truncateTo(Math.max(0, checkpoint));
+  }
+  const ti = Number(el.dataset.threadIndex);
   if (Number.isFinite(ti)) threadLog.length = Math.max(0, ti);
-  let node = userEl;
+  let node = el;
   while (node) {
     const next = node.nextSibling;
     node.remove();
     node = next;
   }
+  if (!thread.querySelector(".bubble")) {
+    if (empty && !empty.parentNode) thread.appendChild(empty);
+  }
   session.persistSession();
+  refreshChatList();
+}
+
+function truncateFromUserBubble(userEl) {
+  truncateFromBubble(userEl);
 }
 
 function beginEditUserBubble(userEl) {
@@ -248,6 +283,66 @@ function beginEditUserBubble(userEl) {
   setStatus("Edit the prompt, then Send to redo", "ok");
 }
 
+function deleteFromBubble(el) {
+  if (busy || !el) return;
+  const isUser = el.classList.contains("user");
+  const label = isUser
+    ? "Delete this message and everything after it?"
+    : "Delete this and everything after it?";
+  if (!confirm(label)) return;
+  clearEditState();
+  truncateFromBubble(el);
+  setStatus("Deleted from here", "ok");
+  promptEl.focus();
+}
+
+function findPreviousUserBubble(fromEl) {
+  let node = fromEl?.previousElementSibling || null;
+  while (node) {
+    if (node.classList?.contains("bubble") && node.classList.contains("user")) {
+      return node;
+    }
+    node = node.previousElementSibling;
+  }
+  return null;
+}
+
+function regenerateFromBot(botEl) {
+  if (busy || !botEl) return;
+  const userEl = findPreviousUserBubble(botEl);
+  if (!userEl) {
+    setStatus("Nothing to regenerate", "err");
+    return;
+  }
+  const prompt =
+    userEl.dataset.prompt ||
+    userEl.querySelector(".user-text")?.textContent ||
+    "";
+  if (!prompt.trim()) {
+    setStatus("Nothing to regenerate", "err");
+    return;
+  }
+
+  const checkpoint = Number(userEl.dataset.historyBefore);
+  // Drop the prior user turn from model history; runChat will push it again.
+  if (Number.isFinite(checkpoint)) {
+    memory.conversation.truncateTo(Math.max(0, checkpoint));
+  }
+
+  const userTi = Number(userEl.dataset.threadIndex);
+  let node = userEl.nextSibling;
+  while (node) {
+    const next = node.nextSibling;
+    node.remove();
+    node = next;
+  }
+  if (Number.isFinite(userTi)) threadLog.length = userTi + 1;
+  clearEditState();
+  persistSession();
+  setStatus("Regenerating…", "busy");
+  void runUserTurn(prompt, { skipUserBubble: true });
+}
+
 function clearSession() {
   memory.clearConversationMemory();
   threadLog.length = 0;
@@ -255,39 +350,37 @@ function clearSession() {
   refineArmed = false;
   updateRefineBanner({ refineArmed, lastImageB64 });
   clearEditState();
-  thread.querySelectorAll(".bubble, .tool-use").forEach((n) => n.remove());
-  if (empty && !empty.parentNode) thread.appendChild(empty);
-  session.wipeStorage();
-  setStatus("History cleared (facts & RAG kept)", "ok");
+  clearThreadDom();
+  session.clearActiveChat();
+  refreshChatList();
+  setStatus("Chat cleared (facts & RAG kept)", "ok");
   promptEl.focus();
 }
 
-function restoreSession() {
-  const data = session.loadSession();
-  if (
-    !data ||
-    (!data.history?.length &&
-      !data.memory?.conversation?.length &&
-      !data.thread.length)
-  ) {
-    return false;
-  }
+function clearThreadDom() {
+  thread.querySelectorAll(".bubble, .tool-use, .memory-compact").forEach((n) => n.remove());
+  if (empty && !empty.parentNode) thread.appendChild(empty);
+}
 
+function paintThreadFromData(data) {
+  clearThreadDom();
   memory.clearConversationMemory();
-  if (data.memory?.conversation) {
+  if (data?.memory?.conversation) {
     memory.importState(data.memory);
-  } else if (data.history?.length) {
+  } else if (data?.history?.length) {
     memory.importState({ conversation: data.history, summary: "" });
   }
 
   threadLog.length = 0;
-  for (const item of data.thread) threadLog.push(item);
+  const items = data?.thread || [];
+  for (const item of items) threadLog.push(item);
 
-  lastImageB64 = data.lastImage;
+  lastImageB64 = data?.lastImage || null;
   refineArmed = false;
   updateRefineBanner({ refineArmed, lastImageB64 });
+  clearEditState();
 
-  data.thread.forEach((item, idx) => {
+  items.forEach((item, idx) => {
     let el = null;
     if (item.t === "user") {
       el = addBubble("user", item.c, {
@@ -295,13 +388,19 @@ function restoreSession() {
         historyBefore: item.historyBefore,
       });
     } else if (item.t === "system") {
-      el = addBubble("system", item.c, { persist: false });
+      el = addBubble("system", item.c, {
+        persist: false,
+        historyBefore: item.historyBefore,
+      });
     } else if (item.t === "bot") {
       el = addBubble("bot", item.c, {
         label: item.label,
         md: item.md !== false,
         persist: false,
+        historyBefore: item.historyBefore,
       });
+    } else if (item.t === "tool") {
+      el = restoreToolCard(item)?.el || null;
     } else if (item.t === "image") {
       el = addImageBubble({
         prompt: item.prompt,
@@ -309,12 +408,164 @@ function restoreSession() {
         label: item.label,
         persist: false,
       });
+      if (el && item.historyBefore != null) {
+        el.dataset.historyBefore = String(item.historyBefore);
+      }
     }
     if (el) el.dataset.threadIndex = String(idx);
   });
 
   scrollThreadToBottom(true);
-  return true;
+}
+
+function restoreSession() {
+  const data = session.loadSession();
+  if (!data) {
+    refreshChatList();
+    return false;
+  }
+  const hasContent =
+    data.history?.length ||
+    data.memory?.conversation?.length ||
+    data.thread.length;
+  paintThreadFromData(data);
+  refreshChatList();
+  return Boolean(hasContent);
+}
+
+function refreshChatList() {
+  if (!chatListEl) return;
+  const chats = session.listChats();
+  const activeId = session.getActiveId();
+  chatListEl.innerHTML = "";
+  for (const c of chats) {
+    const row = document.createElement("div");
+    row.className = "chat-item";
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    row.dataset.chatId = c.id;
+    if (c.id === activeId) row.setAttribute("aria-current", "page");
+
+    const title = document.createElement("span");
+    title.className = "chat-item-title";
+    title.textContent = c.title || "New chat";
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "chat-item-del";
+    del.title = "Delete chat";
+    del.setAttribute("aria-label", `Delete ${c.title || "chat"}`);
+    del.textContent = "✕";
+    del.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      deleteChatById(c.id);
+    });
+
+    row.appendChild(title);
+    row.appendChild(del);
+    row.addEventListener("click", () => switchToChat(c.id));
+    row.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        switchToChat(c.id);
+      }
+    });
+    chatListEl.appendChild(row);
+  }
+}
+
+function switchToChat(id) {
+  if (busy) {
+    setStatus("Wait for the current reply to finish", "err");
+    return;
+  }
+  if (!id || id === session.getActiveId()) return;
+  if (!session.switchChat(id)) return;
+  const data = session.loadSession();
+  paintThreadFromData(data);
+  refreshChatList();
+  promptEl.focus();
+  setStatus("Chat loaded", "ok");
+  maybeCollapseSidebarOnMobile();
+}
+
+function startNewChat() {
+  if (busy) {
+    setStatus("Wait for the current reply to finish", "err");
+    return;
+  }
+  session.createChat();
+  const data = session.loadSession();
+  paintThreadFromData(data || { thread: [], history: [], memory: null, lastImage: null });
+  refreshChatList();
+  promptEl.value = "";
+  promptEl.focus();
+  setStatus("New chat", "ok");
+  maybeCollapseSidebarOnMobile();
+}
+
+function deleteChatById(id) {
+  if (busy) {
+    setStatus("Wait for the current reply to finish", "err");
+    return;
+  }
+  const chats = session.listChats();
+  const target = chats.find((c) => c.id === id);
+  const label = target?.title || "this chat";
+  if (!confirm(`Delete “${label}”?`)) return;
+  const wasActive = id === session.getActiveId();
+  session.deleteChat(id);
+  if (wasActive) {
+    const data = session.loadSession();
+    paintThreadFromData(data || { thread: [], history: [], memory: null, lastImage: null });
+  }
+  refreshChatList();
+  setStatus("Chat deleted", "ok");
+}
+
+function applySidebarCollapsed(collapsed) {
+  document.body.dataset.sidebar = collapsed ? "collapsed" : "open";
+  const label = collapsed ? "Open sidebar" : "Close sidebar";
+  if (sidebarToggle) {
+    sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
+    sidebarToggle.setAttribute("aria-label", label);
+    sidebarToggle.title = label;
+  }
+  if (sidebarClose) sidebarClose.disabled = collapsed;
+  if (sidebarBackdrop) {
+    sidebarBackdrop.tabIndex = collapsed ? -1 : 0;
+  }
+}
+
+function loadSidebarCollapsed() {
+  try {
+    const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (saved === "1") return true;
+    if (saved === "0") return false;
+  } catch {
+    /* ignore */
+  }
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+function setSidebarCollapsed(collapsed) {
+  applySidebarCollapsed(collapsed);
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+function toggleSidebar() {
+  const collapsed = document.body.dataset.sidebar !== "collapsed";
+  setSidebarCollapsed(collapsed);
+}
+
+function maybeCollapseSidebarOnMobile() {
+  if (window.matchMedia("(max-width: 720px)").matches) {
+    setSidebarCollapsed(true);
+  }
 }
 
 function setBusy(on) {
@@ -327,7 +578,12 @@ function setBusy(on) {
   thinkToggleEl.disabled = on || !modelSupportsThink();
   searchToggleEl.disabled = on;
   if (clearChatBtn) clearChatBtn.disabled = on;
-  thread.querySelectorAll(".bubble.user .msg-actions button").forEach((btn) => {
+  if (exportChatBtn) exportChatBtn.disabled = on;
+  if (newChatBtn) newChatBtn.disabled = on;
+  suggestionsEl?.querySelectorAll("button").forEach((btn) => {
+    btn.disabled = on;
+  });
+  thread.querySelectorAll(".msg-actions button").forEach((btn) => {
     btn.disabled = on;
   });
 }
@@ -393,8 +649,8 @@ const chat = createChatRunner({
   getThinkEnabled,
   getSearchEnabled,
   addBubble,
-  persistSession: session.persistSession,
-  recordThread: session.recordThread,
+  persistSession,
+  recordThread,
   setStatus,
   scrollThreadToBottom,
   createMemoryCompactCard,
@@ -411,6 +667,72 @@ const image = createImageRunner({
   },
   updateRefineBanner: () => updateRefineBanner({ refineArmed, lastImageB64 }),
 });
+
+async function runUserTurn(prompt, { skipUserBubble = false } = {}) {
+  if (busy) return;
+  const text = String(prompt || "").trim();
+  if (!text) return;
+
+  const controller = new AbortController();
+  activeAbort = controller;
+  setBusy(true);
+  if (!skipUserBubble) {
+    promptEl.value = "";
+    promptEl.style.height = "auto";
+    clearEditState();
+    addBubble("user", text);
+  }
+  setStatus(mode === "auto" ? "Detecting…" : "Working…", "busy");
+
+  try {
+    const chosen = await resolveMode(text, {
+      mode,
+      signal: controller.signal,
+      getChatModel,
+      lastImageB64,
+      refineArmed,
+    });
+    if (controller.signal.aborted) throw new StoppedError();
+    if (mode === "auto") {
+      const label =
+        chosen === "refine"
+          ? "Auto → Refine"
+          : chosen === "image"
+            ? "Auto → Image"
+            : "Auto → Chat";
+      addBubble("system", label);
+    }
+    if (chosen === "refine") {
+      if (!lastImageB64)
+        throw new Error("No image to refine yet — generate one first.");
+      setStatus("Refining…", "busy");
+      await image.runImage(text, {
+        sourceB64: lastImageB64,
+        signal: controller.signal,
+      });
+    } else if (chosen === "image") {
+      setStatus("Painting…", "busy");
+      await image.runImage(text, { signal: controller.signal });
+    } else {
+      setStatus("Thinking…", "busy");
+      await chat.runChat(text, controller.signal);
+    }
+    setStatus("Ready", "ok");
+  } catch (err) {
+    if (isAbortError(err)) {
+      addBubble("system", "Stopped");
+      setStatus("Stopped", "ok");
+    } else {
+      addBubble("system", String(err.message || err));
+      setStatus(String(err.message || err), "err");
+    }
+  } finally {
+    activeAbort = null;
+    setBusy(false);
+    refreshChatList();
+    promptEl.focus();
+  }
+}
 
 async function checkOllama(restoredExchanges) {
   try {
@@ -621,73 +943,59 @@ clearChatBtn?.addEventListener("click", () => {
     setStatus("Nothing to clear", "ok");
     return;
   }
-  if (!confirm("Clear the conversation history? (Facts & RAG notes are kept)"))
+  if (!confirm("Clear this chat’s messages? (Facts & RAG notes are kept)"))
     return;
   clearSession();
 });
 
+exportChatBtn?.addEventListener("click", () => {
+  if (!threadLog.length) {
+    setStatus("Nothing to export", "ok");
+    return;
+  }
+  const title =
+    session.listChats().find((c) => c.id === session.getActiveId())?.title ||
+    "MyChat";
+  const md = threadToMarkdown(threadLog, { title });
+  const safe = String(title)
+    .replace(/[^\w\-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40) || "mychat";
+  downloadText(`${safe}.md`, md);
+  setStatus("Chat exported", "ok");
+});
+
+suggestionsEl?.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-prompt]");
+  if (!btn || busy) return;
+  const text = btn.dataset.prompt || "";
+  if (!text) return;
+  promptEl.value = text;
+  promptEl.focus();
+  promptEl.style.height = "auto";
+  promptEl.style.height = `${Math.min(promptEl.scrollHeight, 180)}px`;
+  form.requestSubmit();
+});
+
+newChatBtn?.addEventListener("click", () => startNewChat());
+
+sidebarToggle?.addEventListener("click", () => toggleSidebar());
+sidebarClose?.addEventListener("click", () => setSidebarCollapsed(true));
+sidebarBackdrop?.addEventListener("click", () => setSidebarCollapsed(true));
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "[" || e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+  e.preventDefault();
+  toggleSidebar();
+});
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (busy) return;
   const prompt = promptEl.value.trim();
   if (!prompt) return;
-
-  const controller = new AbortController();
-  activeAbort = controller;
-  setBusy(true);
-  promptEl.value = "";
-  promptEl.style.height = "auto";
-  clearEditState();
-  addBubble("user", prompt);
-  setStatus(mode === "auto" ? "Detecting…" : "Working…", "busy");
-
-  try {
-    const chosen = await resolveMode(prompt, {
-      mode,
-      signal: controller.signal,
-      getChatModel,
-      lastImageB64,
-      refineArmed,
-    });
-    if (controller.signal.aborted) throw new StoppedError();
-    if (mode === "auto") {
-      const label =
-        chosen === "refine"
-          ? "Auto → Refine"
-          : chosen === "image"
-            ? "Auto → Image"
-            : "Auto → Chat";
-      addBubble("system", label);
-    }
-    if (chosen === "refine") {
-      if (!lastImageB64)
-        throw new Error("No image to refine yet — generate one first.");
-      setStatus("Refining…", "busy");
-      await image.runImage(prompt, {
-        sourceB64: lastImageB64,
-        signal: controller.signal,
-      });
-    } else if (chosen === "image") {
-      setStatus("Painting…", "busy");
-      await image.runImage(prompt, { signal: controller.signal });
-    } else {
-      setStatus("Thinking…", "busy");
-      await chat.runChat(prompt, controller.signal);
-    }
-    setStatus("Ready", "ok");
-  } catch (err) {
-    if (isAbortError(err)) {
-      addBubble("system", "Stopped");
-      setStatus("Stopped", "ok");
-    } else {
-      addBubble("system", String(err.message || err));
-      setStatus(String(err.message || err), "err");
-    }
-  } finally {
-    activeAbort = null;
-    setBusy(false);
-    promptEl.focus();
-  }
+  await runUserTurn(prompt);
 });
 
 promptEl.addEventListener("input", () => {
@@ -719,6 +1027,7 @@ document.addEventListener("click", (e) => {
   link.rel = "noopener noreferrer";
 });
 
+applySidebarCollapsed(loadSidebarCollapsed());
 const restored = restoreSession();
 const restoredExchanges = restored ? memory.conversation.userTurnCount() : 0;
 syncThinkToggleUi();

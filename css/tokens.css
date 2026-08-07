@@ -25,6 +25,7 @@
   --shadow: 0 10px 32px rgba(79, 51, 137, 0.1);
   --shadow-soft: 0 2px 10px rgba(79, 51, 137, 0.06);
   --col: min(48rem, calc(100% - 2rem));
+  --sidebar-w: 260px;
   --font-display: "Bebas Neue", Impact, sans-serif;
   --font-body: Montserrat, "Helvetica Neue", Helvetica, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;

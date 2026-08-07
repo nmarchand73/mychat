@@ -16,6 +16,13 @@
   animation: rise 0.5s var(--ease) both;
 }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .brand {
   font-family: var(--font-display);
   font-size: 1.85rem;
@@ -24,6 +31,10 @@
   margin: 0;
   color: var(--ink);
   line-height: 1;
+}
+
+@media (max-width: 720px) {
+  .brand { font-size: 1.55rem; }
 }
 
 .brand span { color: var(--accent); }

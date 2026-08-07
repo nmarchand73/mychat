@@ -1,3 +1,4 @@
+<!-- Quality: 8/10 — covers product + Boy Scout scoring; could add screenshots later -->
 # MyChat
 
 Local chat UI for [Ollama](https://ollama.com) — chat, web search, image generation, and a layered memory stack. Everything runs on your machine; no cloud accounts.
@@ -50,11 +51,14 @@ Open **http://127.0.0.1:8765**
 ## What it does
 
 - **Chat** — streaming Markdown answers via Ollama `/api/chat`
+- **Multi-chat sidebar** — new / switch / delete threads; collapsible panel
 - **Auto mode** — routes prompts to chat, image, or refine (regex + optional classifier)
-- **Web search** — model tool `web_search` → local DuckDuckGo (`ddgs`) through `serve.py`
+- **Web search** — model tool `web_search` → local DuckDuckGo (`ddgs`) through `serve.py` (tool cards persist)
 - **Images** — Flux generate / refine; refine reuses the last image when armed
 - **Think** — reasoning UI for `qwen3.5:9b` only (Ministral rejects `think`)
-- **Session** — conversation restored from `localStorage` across reloads
+- **Edit / Delete / Regenerate** — trim the thread from a message; redo the last answer
+- **Export** — download the active chat as Markdown (Settings)
+- **Session** — conversations restored from `localStorage` across reloads
 - **Memory** (Settings)
   - **Facts** — durable notes injected into the system prompt
   - **Local RAG** — embed notes, retrieve on each turn
@@ -67,13 +71,14 @@ Open **http://127.0.0.1:8765**
 
 ```
 Browser (index.html)
- ├── css/          tokens → regions (topbar, chat, composer…)
+ ├── css/          tokens → regions (sidebar, topbar, chat, composer…)
  └── js/
      ├── app.js           composition root (state + events)
      ├── chat.js          turn pipeline (tools + stream)
      ├── image.js         Flux generate / refine
      ├── ui.js            bubbles, tool cards, banners
-     ├── session.js       persist / restore
+     ├── session.js       multi-chat persist / restore
+     ├── export.js        thread → Markdown download
      ├── intent.js        Auto → chat | image | refine
      ├── markdown.js      think tags + safe Markdown
      ├── config.js        models, keys, tools, regexes
@@ -92,6 +97,10 @@ memory/rag_store.py       chunk → embed (Ollama) → cosine retrieve
 | `ui` | DOM only (deps injected) |
 | `memory/*` | Model context (not the visible transcript) |
 | `serve.py` | Search + RAG HTTP; no LLM chat proxy |
+
+### Agent rules (Boy Scout + Quality score)
+
+Cursor rules in [`.cursor/rules/`](.cursor/rules/) keep the codebase maintainable: leave every touched file better than you found it (**Boy Scout**), and track a honest **`Quality: N/10 — note`** in each file header. On the next edit of that file, raise the score only with a real local cleanup — never by inflating the number. See `mychat-boyscout.mdc`, `mychat-modularity.mdc`, and `mychat-coding.mdc`.
 
 ---
 

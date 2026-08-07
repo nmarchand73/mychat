@@ -1,8 +1,10 @@
 ---
 description: MyChat coding practices — style, UX contracts, and safe changes
-globs: "**/*.{js,css,html,py,mjs}"
+globs: "**/*.{js,css,html,py,mjs,mdc}"
 alwaysApply: false
 ---
+
+<!-- Quality: 9/10 — contracts cover sidebar/delete/regen/export/tool restore -->
 
 # MyChat coding practices
 
@@ -13,20 +15,27 @@ alwaysApply: false
 - Match existing naming: `createX`, `runChat` / `runImage`, `setStatus`, `persistSession`.
 - Escape user/tool HTML (`escapeHtml`); Markdown goes through `renderMarkdown` (DOMPurify + `target=_blank`).
 - Use `isAbortError` / `StoppedError` for cancel paths; never swallow abort as a normal failure.
+- On every create/edit: keep **Intent / Architecture / Quality: N/10** in the file header (Boy Scout rule) and try to raise the score.
 
 ## Product contracts
 
 - Think (`think: true`) only for models in `THINK_MODELS` (today: `qwen3.5:9b`).
 - Auto-scroll the thread only when near bottom (`scrollThreadToBottom`).
-- Persist session after meaningful turns; on quota, retry without image payloads.
-- Clear conversation must keep facts & RAG; say so in UI copy.
+- Persist the **active chat** after meaningful turns; on quota, retry without image payloads.
+- Multi-chat: New chat / switch / delete live in the left sidebar; block switch while `busy`.
+- Sidebar is collapsible (ChatGPT/Claude-style): topbar toggle, in-panel close, mobile backdrop; persist `mychat.sidebarCollapsed`; `[` toggles when not typing.
+- Clear **this chat** keeps facts & RAG and keeps the chat slot; say so in UI copy.
+- **Delete** on a bubble removes that message and everything after (model history + UI transcript).
+- **Regenerate** on assistant bubbles redoes from the previous user message.
+- **Export chat** downloads the active thread as Markdown (Settings).
+- Tool cards (`web_search`) persist in the thread and restore across reloads.
 - External links open in a new tab (`noopener noreferrer`).
 
 ## When changing flows
 
 - Update Settings toggles + `config.js` keys together if you add memory/chat options.
 - Extend `js/memory/*` behind the orchestrator facade; UI should keep talking to `prepareTurn` / settings, not raw stores.
-- After navigation / primary CTA / memory / tool UX changes, keep or add coverage under `test/` and run `npm test`.
+- After navigation / primary CTA / memory / tool / sidebar UX changes, keep or add coverage under `test/` and run `npm test`.
 
 ## ❌ Avoid
 
