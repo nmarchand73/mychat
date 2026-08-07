@@ -1,11 +1,12 @@
 /**
  * Intent: generate or refine images via Ollama Flux (`/api/generate`).
- * Architecture: factory `createImageRunner(deps)` — posts prompt (+ optional
- * reference image), then asks UI to show the bubble and update lastImage.
- * Quality: 8/10 — getImageModel dep wired; fixed 512² unrelated to picker
+ * Architecture: factory `createImageRunner(deps)` — shows a bot phase bubble
+ * while waiting (same presence as chat), then swaps in the image result.
+ * Quality: 8/10 — is-generating + setWorkingPhase while Flux runs; still fixed 512²
  */
 
 import { OLLAMA, IMAGE_MODEL } from "./config.js";
+import { setWorkingPhase } from "./markdown.js";
 import { isAbortError, StoppedError } from "./util.js";
 
 /**
@@ -31,11 +32,20 @@ export function createImageRunner(deps) {
   async function runImage(prompt, { sourceB64 = null, signal = undefined } = {}) {
     const model = getImageModel() || IMAGE_MODEL;
     const refining = Boolean(sourceB64);
-    addBubble(
-      "system",
+
+    const placeholder = addBubble("bot", "", {
+      label: model,
+      persist: false,
+    });
+    const body = document.createElement("div");
+    body.className = "md";
+    placeholder.appendChild(body);
+    placeholder.classList.add("is-generating");
+    setWorkingPhase(
+      body,
       refining
-        ? `Varying with ${model} (reference sent; Ollama may still reinvent the scene)…`
-        : `Generating with ${model}…`
+        ? "Refining image (reference sent; may still reinvent the scene)…"
+        : "Painting image…"
     );
 
     const payload = {
@@ -47,40 +57,46 @@ export function createImageRunner(deps) {
     };
     if (sourceB64) payload.images = [sourceB64];
 
-    let res;
     try {
-      res = await fetch(`${OLLAMA}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal,
-        body: JSON.stringify(payload),
+      let res;
+      try {
+        res = await fetch(`${OLLAMA}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal,
+          body: JSON.stringify(payload),
+        });
+      } catch (err) {
+        if (isAbortError(err)) throw new StoppedError();
+        throw err;
+      }
+
+      const raw = await res.text();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(raw || `Image failed (${res.status})`);
+      }
+      if (!res.ok || data.error)
+        throw new Error(data.error || `Image failed (${res.status})`);
+      if (!data.image)
+        throw new Error("No image returned — is Ollama 0.32.5 with image gen?");
+
+      setLastImage(data.image);
+      clearRefineArmed();
+      updateRefineBanner();
+
+      placeholder.remove();
+      addImageBubble({
+        prompt,
+        b64: data.image,
+        label: refining ? `${model} · refined` : model,
       });
     } catch (err) {
-      if (isAbortError(err)) throw new StoppedError();
+      placeholder.remove();
       throw err;
     }
-
-    const raw = await res.text();
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      throw new Error(raw || `Image failed (${res.status})`);
-    }
-    if (!res.ok || data.error)
-      throw new Error(data.error || `Image failed (${res.status})`);
-    if (!data.image)
-      throw new Error("No image returned — is Ollama 0.32.5 with image gen?");
-
-    setLastImage(data.image);
-    clearRefineArmed();
-    updateRefineBanner();
-
-    addImageBubble({
-      prompt,
-      b64: data.image,
-      label: refining ? `${model} · refined` : model,
-    });
   }
 
   return { runImage };
