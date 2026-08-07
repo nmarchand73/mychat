@@ -2,7 +2,7 @@
  * Intent: boot the UI, own mutable app state, wire user events.
  * Architecture: composition root — imports factories (ui/chat/image/session/memory)
  * and holds mode/busy/session flags; no heavy chat/image logic lives here.
- * Quality: 7/10 — image picker mirrors chat model; composition root still monolithic
+ * Quality: 7/10 — shimmer placeholder wired in runUserTurn; root still ~1k lines
  */
 
 import { createMemorySystem } from "./memory/orchestrator.js";
@@ -209,6 +209,7 @@ const {
   updateEditBanner,
   addBubble,
   addImageBubble,
+  addImagePlaceholder,
   createMemoryCompactCard,
   createToolUseCard,
   restoreToolCard,
@@ -681,6 +682,7 @@ const chat = createChatRunner({
 const image = createImageRunner({
   addBubble,
   addImageBubble,
+  addImagePlaceholder,
   setLastImage,
   clearRefineArmed: () => {
     refineArmed = false;

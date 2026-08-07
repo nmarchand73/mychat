@@ -1,7 +1,7 @@
 /**
- * Intent: motion primitives for chat presence (think, stream, phase, busy).
+ * Intent: motion primitives for chat presence (think, stream, phase, busy, image scan/reveal).
  * Architecture: @keyframes + reduced-motion kill switch; classes live in chat/composer.
- * Quality: 8/10 — Claude-like dots/caret/shimmer; no heavy JS timelines
+ * Quality: 7/10 — img-scan-band for wait tile; reveal easing lives in chat.css.
  */
 
 @keyframes rise {
@@ -51,6 +51,16 @@
 @keyframes status-shimmer {
   0% { background-position: 0% 50%; }
   100% { background-position: 200% 50%; }
+}
+
+@keyframes img-placeholder-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@keyframes img-scan-band {
+  0% { background-position: 0 -40%; }
+  100% { background-position: 0 140%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,18 +1,17 @@
 /**
  * Intent: generate or refine images via Ollama Flux (`/api/generate`).
- * Architecture: factory `createImageRunner(deps)` — shows a bot phase bubble
- * while waiting (same presence as chat), then swaps in the image result.
- * Quality: 8/10 — is-generating + setWorkingPhase while Flux runs; still fixed 512²
+ * Architecture: factory `createImageRunner(deps)` — shimmer wait, then
+ * ChatGPT-like top-down frosted reveal into the final image.
+ * Quality: 8/10 — reveal flag wired post-fetch; placeholder→bubble swap is abrupt.
  */
 
 import { OLLAMA, IMAGE_MODEL } from "./config.js";
-import { setWorkingPhase } from "./markdown.js";
 import { isAbortError, StoppedError } from "./util.js";
 
 /**
  * @param {{
- *   addBubble: Function,
  *   addImageBubble: Function,
+ *   addImagePlaceholder: Function,
  *   setLastImage: (b64: string) => void,
  *   clearRefineArmed: () => void,
  *   updateRefineBanner: Function,
@@ -21,8 +20,8 @@ import { isAbortError, StoppedError } from "./util.js";
  */
 export function createImageRunner(deps) {
   const {
-    addBubble,
     addImageBubble,
+    addImagePlaceholder,
     setLastImage,
     clearRefineArmed,
     updateRefineBanner,
@@ -33,20 +32,10 @@ export function createImageRunner(deps) {
     const model = getImageModel() || IMAGE_MODEL;
     const refining = Boolean(sourceB64);
 
-    const placeholder = addBubble("bot", "", {
+    const placeholder = addImagePlaceholder({
       label: model,
-      persist: false,
+      message: refining ? "Editing image…" : "Creating image…",
     });
-    const body = document.createElement("div");
-    body.className = "md";
-    placeholder.appendChild(body);
-    placeholder.classList.add("is-generating");
-    setWorkingPhase(
-      body,
-      refining
-        ? "Refining image (reference sent; may still reinvent the scene)…"
-        : "Painting image…"
-    );
 
     const payload = {
       model,
@@ -92,6 +81,7 @@ export function createImageRunner(deps) {
         prompt,
         b64: data.image,
         label: refining ? `${model} · refined` : model,
+        reveal: true,
       });
     } catch (err) {
       placeholder.remove();

@@ -1,7 +1,7 @@
 /**
  * Intent: conversation thread — bubbles, markdown, think, tool/memory cards.
  * Architecture: .stage/.thread scroll area; message chrome is class-driven (.bubble, .tool-use, .thought).
- * Quality: 9/10 — streaming caret, think shimmer, phase dots; reduced-motion handled globally
+ * Quality: 8/10 — top-down frosted mask wipe + backdrop-filter; hard cut from wait tile.
  */
 .stage {
   flex: 1 1 auto;
@@ -773,9 +773,130 @@
 
 .bubble > img {
   display: block;
-  width: min(100%, 480px);
+  width: min(100%, 420px);
   border-radius: 14px;
   margin-top: 4px;
+}
+
+/* Waiting: soft tile + status (no real partials from Ollama) */
+.bubble.is-image-gen {
+  max-width: min(100%, 420px);
+}
+
+.img-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.img-placeholder-frame {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--ink) 4%, var(--bg-elev)) 0%,
+    color-mix(in srgb, var(--ink) 10%, var(--bg-elev)) 55%,
+    color-mix(in srgb, var(--ink) 6%, var(--bg-elev)) 100%
+  );
+}
+
+.img-placeholder-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--bg-elev) 55%, transparent) 42%,
+    color-mix(in srgb, var(--ink) 8%, var(--bg-elev)) 58%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+  animation: img-scan-band 2.4s ease-in-out infinite;
+}
+
+.img-placeholder-msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font: 500 0.9rem var(--font-body);
+}
+
+.img-placeholder-msg .phase-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.img-placeholder-msg .phase-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.45;
+  animation: bounce-dot 1.05s ease-in-out infinite;
+}
+
+.img-placeholder-msg .phase-dots i:nth-child(2) { animation-delay: 0.14s; }
+.img-placeholder-msg .phase-dots i:nth-child(3) { animation-delay: 0.28s; }
+
+.img-placeholder-text {
+  font-style: normal;
+}
+
+/* Arrive: top→bottom frosted wipe (4o-inspired) */
+.img-reveal {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 420px);
+  border-radius: 14px;
+  margin-top: 4px;
+}
+
+.img-reveal-photo {
+  display: block;
+  width: 100%;
+  border-radius: 14px;
+  vertical-align: top;
+}
+
+.img-reveal-frost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--bg-elev) 28%, transparent);
+  backdrop-filter: blur(22px) saturate(1.05);
+  -webkit-backdrop-filter: blur(22px) saturate(1.05);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 18%,
+    #000 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 18%,
+    #000 100%
+  );
+  transform: translateY(0%);
+  transition: transform 2.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.img-reveal.is-revealed .img-reveal-frost {
+  transform: translateY(108%);
+}
+
+.img-reveal.is-done {
+  overflow: visible;
 }
 
 .bubble .img-actions {

@@ -2,7 +2,8 @@
  * Intent: build thread DOM (bubbles, tool cards, banners, status, scroll).
  * Architecture: factory `createUi(deps)` returns helpers; persistence / edit /
  * delete / regenerate callbacks stay injected — presentation only.
- * Quality: 8/10 — tool restore + regenerate; streaming bot shell still special-cased
+ * Includes ChatGPT-style image wait tile + top-down frosted reveal on arrival.
+ * Quality: 8/10 — double-rAF frosted wipe, reduced-motion skip, frost cleanup; no reveal on restore.
  */
 
 import { renderMarkdown, setWorkingPhase } from "./markdown.js";
@@ -198,7 +199,21 @@ export function createUi(deps) {
     return el;
   }
 
-  function addImageBubble({ prompt, b64, label, persist = true }) {
+  function prefersReducedMotion() {
+    try {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      return false;
+    }
+  }
+
+  function addImageBubble({
+    prompt,
+    b64,
+    label,
+    persist = true,
+    reveal = false,
+  }) {
     const before = getHistoryLength();
     const src = b64 ? `data:image/png;base64,${b64}` : "";
     const bot = addBubble("bot", "", {
@@ -207,10 +222,40 @@ export function createUi(deps) {
       historyBefore: before,
     });
     if (b64) {
-      const img = document.createElement("img");
-      img.src = src;
-      img.alt = prompt;
-      bot.appendChild(img);
+      const useReveal = reveal && !prefersReducedMotion();
+      if (useReveal) {
+        const wrap = document.createElement("div");
+        wrap.className = "img-reveal";
+        const img = document.createElement("img");
+        img.className = "img-reveal-photo";
+        img.src = src;
+        img.alt = prompt;
+        const frost = document.createElement("div");
+        frost.className = "img-reveal-frost";
+        frost.setAttribute("aria-hidden", "true");
+        wrap.appendChild(img);
+        wrap.appendChild(frost);
+        bot.appendChild(wrap);
+        // Double rAF so the frost starts covering, then slides down.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            wrap.classList.add("is-revealed");
+          });
+        });
+        frost.addEventListener(
+          "transitionend",
+          () => {
+            frost.remove();
+            wrap.classList.add("is-done");
+          },
+          { once: true }
+        );
+      } else {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = prompt;
+        bot.appendChild(img);
+      }
     } else {
       const note = document.createElement("div");
       note.className = "md";
@@ -257,6 +302,34 @@ export function createUi(deps) {
     }
     const actionBar = bot.querySelector(".msg-actions");
     if (actionBar) bot.appendChild(actionBar);
+    scrollThreadToBottom(true);
+    return bot;
+  }
+
+  /** ChatGPT-style shimmer tile + status line while Flux runs. */
+  function addImagePlaceholder({ label, message }) {
+    const bot = addBubble("bot", "", { label, persist: false });
+    bot.classList.add("is-generating", "is-image-gen");
+    bot.querySelector(".msg-actions")?.remove();
+
+    const wrap = document.createElement("div");
+    wrap.className = "img-placeholder";
+    wrap.setAttribute("aria-busy", "true");
+    wrap.setAttribute("aria-live", "polite");
+
+    const frame = document.createElement("div");
+    frame.className = "img-placeholder-frame";
+    frame.setAttribute("aria-hidden", "true");
+
+    const msg = document.createElement("p");
+    msg.className = "img-placeholder-msg";
+    msg.innerHTML =
+      `<span class="phase-dots" aria-hidden="true"><i></i><i></i><i></i></span>` +
+      `<span class="img-placeholder-text">${escapeHtml(message)}</span>`;
+
+    wrap.appendChild(frame);
+    wrap.appendChild(msg);
+    bot.appendChild(wrap);
     scrollThreadToBottom(true);
     return bot;
   }
@@ -479,6 +552,7 @@ export function createUi(deps) {
     updateEditBanner,
     addBubble,
     addImageBubble,
+    addImagePlaceholder,
     createMemoryCompactCard,
     createToolUseCard,
     restoreToolCard,
