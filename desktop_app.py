@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Intent: native desktop shell for MyChat (local window over serve.py).
-Architecture: background ThreadingHTTPServer + pywebview (Cocoa) window to
-127.0.0.1:PORT; write launch errors to ~/Library/Logs/MyChat.log; alert on failure.
-Quality: 7/10 — focused launcher; bare except on log/alert; no tests
+Architecture: background ThreadingHTTPServer + pywebview (Cocoa) to
+127.0.0.1:PORT; private_mode=False so chats/settings persist; RAG under
+~/Library/Application Support/MyChat; launch errors in ~/Library/Logs/MyChat.log.
+Quality: 8/10 — private_mode=False + MYCHAT_DATA_DIR before serve; alert/log on crash.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 LOG_DIR = Path.home() / "Library" / "Logs"
 LOG_FILE = LOG_DIR / "MyChat.log"
+SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "MyChat"
 
 
 def _log(msg: str) -> None:
@@ -74,6 +76,9 @@ def main() -> int:
     os.chdir(ROOT)
     # Prefer Cocoa; avoids picking a headless backend when GUI env is thin.
     os.environ.setdefault("PYWEBVIEW_GUI", "cocoa")
+    # Durable files outside the .app bundle (survives rebuilds / is writable).
+    SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("MYCHAT_DATA_DIR", str(SUPPORT_DIR))
 
     try:
         # Register as a real GUI app before creating the window (Finder launches).
@@ -117,7 +122,8 @@ def main() -> int:
         background_color="#f7f0e4",
     )
     try:
-        webview.start()
+        # Default private_mode=True wipes localStorage every launch.
+        webview.start(private_mode=False, storage_path=str(SUPPORT_DIR / "webview"))
     finally:
         if httpd is not None:
             httpd.shutdown()

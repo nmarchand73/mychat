@@ -1,4 +1,4 @@
-<!-- Quality: 8/10 — 4b/9b picker documented; no troubleshooting or screenshots -->
+<!-- Quality: 8/10 — private_mode + Application Support RAG documented; no troubleshooting -->
 # MyChat
 
 Local chat UI for [Ollama](https://ollama.com) — chat, web search, image generation, and a layered memory stack. Everything runs on your machine; no cloud accounts.
@@ -57,7 +57,7 @@ chmod +x scripts/build_macos_app.sh
 open dist/MyChat.app
 ```
 
-Optional: drag `dist/MyChat.app` into **Applications**. Icon: `assets/icon-1024.png`. Logs: `~/Library/Logs/MyChat.log`. Ollama must still be running for chat/images/RAG. Rebuild after code changes so the bundle stays in sync.
+Optional: drag `dist/MyChat.app` into **Applications**. Icon: `assets/icon-1024.png`. Logs: `~/Library/Logs/MyChat.log`. Chats/settings persist in the app WebView (`private_mode` off); RAG notes live in `~/Library/Application Support/MyChat/`. Ollama must still be running. Rebuild after code changes so the bundle stays in sync.
 
 Dev window without rebuilding the `.app`:
 
@@ -77,7 +77,7 @@ Dev window without rebuilding the `.app`:
 - **Think** — reasoning UI for `qwen3.5:9b` only (Ministral rejects `think`)
 - **Edit / Delete / Regenerate** — trim the thread from a message; redo the last answer
 - **Export** — download the active chat as Markdown (Settings)
-- **Session** — conversations restored from `localStorage` across reloads
+- **Session** — conversations restored from `localStorage` across reloads (desktop app keeps them too)
 - **Memory** (Settings)
   - **Facts** — durable notes injected into the system prompt
   - **Local RAG** — embed notes, retrieve on each turn

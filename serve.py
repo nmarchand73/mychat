@@ -3,12 +3,13 @@
 Intent: serve the static MyChat UI plus local APIs (search + RAG).
 Architecture: ThreadingHTTPServer from ROOT; /api/search (ddgs), /api/rag/*
 and /api/health; everything else is static files with no-store caching.
-Quality: 7/10 — make_server() clean; repeated rag imports + broad except per route
+Quality: 7/10 — MYCHAT_DATA_DIR before rag import; repeated rag imports + broad except per route
 """
 
 from __future__ import annotations
 
 import json
+import os
 import traceback
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -16,6 +17,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PORT = 8765
+
+# Durable RAG path (same as desktop app); must be set before memory.rag_store import.
+os.environ.setdefault(
+    "MYCHAT_DATA_DIR",
+    str(Path.home() / "Library" / "Application Support" / "MyChat"),
+)
 
 
 def web_search(query: str, max_results: int = 5) -> list[dict]:

@@ -1,14 +1,17 @@
 """
 Intent: local RAG — chunk text, embed via Ollama, cosine retrieve.
-Architecture: JSONL/disk store under MyChat data dir; embeds with
-nomic-embed-text; exposed to the UI through serve.py /api/rag/*.
+Architecture: JSON store under Application Support (or MYCHAT_DATA_DIR);
+embeds with nomic-embed-text; exposed via serve.py /api/rag/*.
+Quality: 7/10 — Application Support + legacy migrate; append-only ingest, non-atomic save.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import os
 import re
+import shutil
 import time
 import urllib.error
 import urllib.request
@@ -17,15 +20,36 @@ from pathlib import Path
 
 OLLAMA = "http://127.0.0.1:11434"
 EMBED_MODEL = "nomic-embed-text"
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "rag"
-STORE_PATH = DATA_DIR / "chunks.json"
+LEGACY_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "rag"
 MAX_CHUNKS = 400
 CHUNK_SIZE = 900
 CHUNK_OVERLAP = 120
 
 
+def _resolve_data_dir() -> Path:
+    env = (os.environ.get("MYCHAT_DATA_DIR") or "").strip()
+    if env:
+        return Path(env).expanduser() / "rag"
+    # Durable path: survives .app rebuilds and is writable from Finder launches.
+    return Path.home() / "Library" / "Application Support" / "MyChat" / "rag"
+
+
+DATA_DIR = _resolve_data_dir()
+STORE_PATH = DATA_DIR / "chunks.json"
+
+
 def _ensure_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # One-time migrate from old repo-local data/rag if present.
+    legacy = LEGACY_DATA_DIR / "chunks.json"
+    if STORE_PATH.exists() or not legacy.is_file():
+        return
+    try:
+        if legacy.stat().st_size <= 2:
+            return
+        shutil.copy2(legacy, STORE_PATH)
+    except OSError:
+        pass
 
 
 def _load() -> list[dict]:
