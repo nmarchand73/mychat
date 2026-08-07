@@ -1,0 +1,35 @@
+---
+description: MyChat coding practices — style, UX contracts, and safe changes
+globs: "**/*.{js,css,html,py,mjs}"
+alwaysApply: false
+---
+
+# MyChat coding practices
+
+## Style
+
+- Prefer small, named functions; factories when a module needs DOM/memory callbacks.
+- Keep imports at the top of the file (no inline imports).
+- Match existing naming: `createX`, `runChat` / `runImage`, `setStatus`, `persistSession`.
+- Escape user/tool HTML (`escapeHtml`); Markdown goes through `renderMarkdown` (DOMPurify + `target=_blank`).
+- Use `isAbortError` / `StoppedError` for cancel paths; never swallow abort as a normal failure.
+
+## Product contracts
+
+- Think (`think: true`) only for models in `THINK_MODELS` (today: `qwen3.5:9b`).
+- Auto-scroll the thread only when near bottom (`scrollThreadToBottom`).
+- Persist session after meaningful turns; on quota, retry without image payloads.
+- Clear conversation must keep facts & RAG; say so in UI copy.
+- External links open in a new tab (`noopener noreferrer`).
+
+## When changing flows
+
+- Update Settings toggles + `config.js` keys together if you add memory/chat options.
+- Extend `js/memory/*` behind the orchestrator facade; UI should keep talking to `prepareTurn` / settings, not raw stores.
+- After navigation / primary CTA / memory / tool UX changes, keep or add coverage under `test/` and run `npm test`.
+
+## ❌ Avoid
+
+- Purple/glow “AI slop” restyles; keep the cream + violet/magenta token set in `css/tokens.css`
+- `waitForTimeout`-style brittle waits in any future UI tests — assert roles/text/URL
+- Broad drive-by refactors unrelated to the request

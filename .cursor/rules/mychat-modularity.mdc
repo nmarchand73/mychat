@@ -1,0 +1,45 @@
+---
+description: MyChat modularity — keep thin modules, composition root, and clear boundaries
+alwaysApply: true
+---
+
+# MyChat modularity
+
+Preserve the current layout. Do not collapse back into a monolithic `index.html` or a single mega `app.js`.
+
+## Layout
+
+```
+index.html          markup only (no inline CSS/JS logic)
+css/main.css        @imports by region (tokens → base → topbar/settings/chat/composer/animations)
+js/app.js           composition root: DOM refs, mutable state, event listeners, wiring
+js/config.js        constants, models, tools, regexes — no DOM, no I/O
+js/chat.js          chat turn pipeline (Ollama + tools + stream)
+js/image.js         Flux generate / refine
+js/ui.js            DOM helpers (bubbles, cards, banners, status)
+js/session.js       localStorage persist / restore
+js/intent.js        Auto → chat | image | refine
+js/markdown.js      think tags + safe Markdown (links open in new tab)
+js/util.js          StoppedError, abort detection, escapeHtml
+js/memory/*         conversation, facts, summarizer, rag, orchestrator facade
+serve.py            static + /api/search + /api/rag/* (no chat proxy)
+memory/rag_store.py chunk → embed → retrieve
+```
+
+## Boundaries
+
+- **UI transcript** (`threadLog`) ≠ **model history** (`memory/conversation`). Keep both.
+- Pipelines take **injected deps** / factories (`createUi`, `createChatRunner`, …). Do not reach into `app.js` globals from leaf modules.
+- Browser talks to Ollama directly; `serve.py` only serves files + search + RAG.
+- Put new feature code in the owning module; grow `app.js` only for state + wiring.
+
+## Module headers
+
+Every JS/CSS/Python module starts with a short **Intent** + **Architecture** comment block.
+
+## ❌ Avoid
+
+- Inline `<style>` / large `<script>` in `index.html`
+- Importing `location` / DOM at top-level in modules that Node tests may load (use getters like `getSearchApi()`)
+- Mixing chat streaming logic into `ui.js`, or DOM building into `chat.js`
+- Deleting golden-path / memory tests when changing history, tools, or RAG
