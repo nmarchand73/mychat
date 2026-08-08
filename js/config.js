@@ -1,12 +1,24 @@
 /**
  * Intent: single source of truth for URLs, keys, models, tools, intent regexes.
  * Architecture: pure exports — no DOM, no I/O; imported by app/chat/image/intent.
- * Quality: 9/10 — IMAGE_MODELS/IMAGE_MODEL_KEY mirror chat; single source of truth
+ * Quality: 9/10 — apiOrigin harden + SEARCH_INTENT; intent regexes still untested
  */
 
 export const OLLAMA = "http://127.0.0.1:11434";
+
+/** Stable origin for local APIs (WKWebView / odd origins fall back to serve.py). */
+export function apiOrigin() {
+  try {
+    const o = location.origin;
+    if (o && o !== "null" && /^https?:\/\//i.test(o)) return o;
+  } catch {
+    /* ignore */
+  }
+  return "http://127.0.0.1:8765";
+}
+
 export function getSearchApi() {
-  return `${location.origin}/api/search`;
+  return `${apiOrigin()}/api/search`;
 }
 export const CHAT_MODELS = ["ministral-3:8b", "qwen3.5:9b"];
 /** Models that accept Ollama `think: true` */
@@ -31,7 +43,7 @@ export const WEB_SEARCH_TOOL = {
   function: {
     name: "web_search",
     description:
-      "Search the public web from this laptop (local DuckDuckGo via ddgs). Use for current events, facts, docs, or anything that needs up-to-date information.",
+      "Search the public web from this laptop (local DuckDuckGo via ddgs). ALWAYS call this when the user asks to search, research, look something up, or wants current news/events. Do not answer those from memory alone.",
     parameters: {
       type: "object",
       properties: {
@@ -48,6 +60,15 @@ export const WEB_SEARCH_TOOL = {
     },
   },
 };
+
+/** Explicit “search the web / research” asks — force a local search even if the model skips tools */
+export const SEARCH_INTENT = new RegExp(
+  [
+    String.raw`\b(web[- ]?search|search\s+the\s+web|google|look\s+up|recherch\w*|cherche[rz]?\b|fait\s+des\s+recherches|faire\s+des\s+recherches|sur\s+le\s+web|en\s+ligne)\b`,
+    String.raw`\b(actualité|actualites|news|latest|aujourd['’]hui|current\s+events)\b`,
+  ].join("|"),
+  "i"
+);
 
 // Strong positives: explicit generation verbs / visual artefacts
 export const IMAGE_STRONG = new RegExp(

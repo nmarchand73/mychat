@@ -2,7 +2,7 @@
  * Intent: run one chat turn end-to-end (memory prep → tools → stream answer).
  * Architecture: factory `createChatRunner(deps)` closes over UI/memory callbacks;
  * talks to Ollama `/api/chat` and local `/api/search`; does not own DOM state.
- * Quality: 8/10 — streaming caret/is-generating wired; runChat still long
+ * Quality: 8/10 — forced search injects system results then streams final answer; no synthetic tool_calls; runChat still long
  */
 
 import {
@@ -10,6 +10,7 @@ import {
   getSearchApi,
   MAX_TOOL_ROUNDS,
   WEB_SEARCH_TOOL,
+  SEARCH_INTENT,
 } from "./config.js";
 import {
   createThoughtBlock,
@@ -37,6 +38,52 @@ export function formatSearchForModel(results) {
   return results
     .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
     .join("\n\n");
+}
+
+export function wantsForcedSearch(text) {
+  return SEARCH_INTENT.test(String(text || ""));
+}
+
+/** Strip “search the web” framing so ddgs gets a usable query. */
+export function extractSearchQuery(text) {
+  const raw = String(text || "").trim();
+  const cleaned = raw
+    .replace(
+      /^(peux[- ]tu|can you|please|svp|s'il te pla[iî]t)\s+/i,
+      ""
+    )
+    .replace(
+      /\b(fait|fais|faire|lance|lancer)\s+(des?\s+)?recherches?\s*((sur\s+le\s+web|web|en ligne)\s*)?[:\-]?\s*/i,
+      ""
+    )
+    .replace(
+      /\b(search|google|look\s+up|rechercher?|cherche[rz]?)\s*((the\s+web|online|en ligne|sur\s+le\s+web)\s*(for\s+)?)?/i,
+      ""
+    )
+    .replace(/^[:\-–—]\s*/, "")
+    .trim();
+  return cleaned || raw;
+}
+
+function toolCallName(call) {
+  return (
+    call?.function?.name ||
+    call?.name ||
+    call?.function_name ||
+    ""
+  );
+}
+
+function toolCallArgs(call) {
+  let args = call?.function?.arguments ?? call?.arguments ?? {};
+  if (typeof args === "string") {
+    try {
+      args = JSON.parse(args);
+    } catch {
+      args = { query: args };
+    }
+  }
+  return args && typeof args === "object" ? args : { query: String(args || "") };
 }
 
 /**
@@ -116,7 +163,7 @@ export function createChatRunner(deps) {
     persistSession();
 
     const baseSystem = wantSearch
-      ? "You are MyChat, a helpful local assistant. You can call web_search for up-to-date facts. Prefer clear Markdown. Be concise. Cite links from search results when useful."
+      ? "You are MyChat, a helpful local assistant. You can call web_search for up-to-date facts. When the user asks to search or research, you MUST call web_search before answering. Prefer clear Markdown. Be concise. Cite links from search results when useful."
       : "You are MyChat, a helpful local assistant. Prefer clear Markdown (headings, lists, fenced code) when it improves readability. Be concise unless asked for detail.";
 
     let fullContent = "";
@@ -177,7 +224,48 @@ export function createChatRunner(deps) {
       if (memory.settings.rememberToolEnabled)
         tools.push(memory.rememberToolSchema());
 
-      if (tools.length) {
+      // Explicit search asks: run ddgs immediately (models often skip tools).
+      // Inject results as context — avoid synthetic tool_calls that can stall the final answer.
+      if (wantSearch && wantsForcedSearch(prompt)) {
+        const query = extractSearchQuery(prompt);
+        const card = createToolUseCard({
+          name: "web_search",
+          input: { query, max_results: 5 },
+          beforeEl: bot,
+        });
+        setStatus(`Searching: ${query}`, "busy");
+        setWorkingPhase(body, "Searching the web…");
+        scrollThreadToBottom();
+        try {
+          const results = await localWebSearch(query, 5, signal);
+          card.setDone(results);
+          const content = formatSearchForModel(results);
+          messages.push({
+            role: "system",
+            content:
+              `## Web search results for "${query}"\n\n${content}\n\n` +
+              "Answer the user using these results. Cite links. If results are thin, say so.",
+          });
+          usedTools = true;
+        } catch (err) {
+          if (isAbortError(err)) throw err;
+          card.setError(String(err.message || err));
+          messages.push({
+            role: "system",
+            content: `Web search failed (${err.message || err}). Answer from what you know and say search was unavailable.`,
+          });
+          usedTools = true;
+          addBubble("system", `Web search failed: ${err.message || err}`);
+        }
+        persistSession();
+      } else if (!wantSearch && wantsForcedSearch(prompt)) {
+        addBubble(
+          "system",
+          "Web search is off — enable it in Settings to search the web."
+        );
+      }
+
+      if (tools.length && !(usedTools && wantsForcedSearch(prompt))) {
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           if (usedTools) {
             setStatus("Digesting tool results…", "busy");
@@ -217,16 +305,8 @@ export function createChatRunner(deps) {
           });
 
           for (const call of toolCalls) {
-            const fn = call.function || {};
-            const name = fn.name || "";
-            let args = fn.arguments || {};
-            if (typeof args === "string") {
-              try {
-                args = JSON.parse(args);
-              } catch {
-                args = { query: args };
-              }
-            }
+            const name = toolCallName(call);
+            const args = toolCallArgs(call);
 
             if (name === "remember_fact") {
               const result = memory.executeRememberFact(args);

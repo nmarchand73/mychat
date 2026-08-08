@@ -3,7 +3,7 @@
  * Architecture: factory `createUi(deps)` returns helpers; persistence / edit /
  * delete / regenerate callbacks stay injected — presentation only.
  * Includes ChatGPT-style image wait tile + top-down frosted reveal on arrival.
- * Quality: 8/10 — double-rAF frosted wipe, reduced-motion skip, frost cleanup; no reveal on restore.
+ * Quality: 8/10 — msg-actions absolute so text centering/padding fixed; no system actions.
  */
 
 import { renderMarkdown, setWorkingPhase } from "./markdown.js";
@@ -183,8 +183,8 @@ export function createUi(deps) {
       const before =
         historyBefore != null ? Number(historyBefore) : getHistoryLength();
       el.dataset.historyBefore = String(before);
-      if (role === "bot" || role === "system") {
-        attachMsgActions(el, { regenerate: role === "bot" });
+      if (role === "bot") {
+        attachMsgActions(el, { regenerate: true });
       }
       if (persist && role === "system") {
         recordThread(
