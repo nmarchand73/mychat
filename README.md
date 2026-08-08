@@ -57,12 +57,13 @@ chmod +x scripts/build_macos_app.sh
 open dist/MyChat.app
 ```
 
-Optional: drag `dist/MyChat.app` into **Applications**. Icon: `assets/icon-1024.png`. Logs: `~/Library/Logs/MyChat.log`. Chats/settings persist in the app WebView (`private_mode` off); RAG notes live in `~/Library/Application Support/MyChat/`. Ollama must still be running. Rebuild after code changes so the bundle stays in sync.
+Optional: drag `dist/MyChat.app` into **Applications**. Icon: `assets/icon-1024.png`. Logs: `~/Library/Logs/MyChat.log`. Chats/settings persist in the app WebView (`private_mode` off); RAG notes live in `~/Library/Application Support/MyChat/`. The desktop shell listens on **8770** by default (`MYCHAT_PORT`, auto-picks the next free port if busy) so it can run beside browser `serve.py` on **8765**. Ollama must still be running. Rebuild after code changes so the bundle stays in sync.
 
 Dev window without rebuilding the `.app`:
 
 ```bash
 .venv/bin/python desktop_app.py
+# or: MYCHAT_PORT=8771 .venv/bin/python desktop_app.py
 ```
 
 ---

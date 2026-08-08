@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Intent: build a double-clickable macOS MyChat.app with icon + launcher.
 # Architecture: embeds app sources + a private venv under Contents/Resources so
-# Finder launches are not blocked by Documents-folder TCC (external .venv).
-# Quality: 7/10 — self-contained bundle proven; Darwin-only; full rsync+venv each rebuild
+# Finder launches are not blocked by Documents-folder TCC. User data lives in
+# ~/Library/Application Support/MyChat (RAG, webview). Desktop listens on 8770+
+# (see desktop_app.py) so it can run beside browser serve.py on 8765.
+# Quality: 8/10 — Chess Insight-style self-contained bundle; Darwin-only
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -89,18 +91,24 @@ BUNDLE_PY="$VENV_DIR/bin/python"
 
 cat > "$MACOS/MyChat" <<EOF
 #!/bin/bash
-# Self-contained launcher: everything lives under this .app (avoids Documents TCC).
+# Self-contained launcher: code+venv in this .app; data in Application Support.
 DIR="\$(cd "\$(dirname "\$0")/.." && pwd)"
 APP_ROOT="\$DIR/Resources/app"
 PY="\$DIR/Resources/venv/bin/python"
 export PYTHONUNBUFFERED=1
 export PYWEBVIEW_GUI=cocoa
+export MYCHAT_DATA_DIR="\${MYCHAT_DATA_DIR:-\$HOME/Library/Application Support/MyChat}"
+# Desktop default 8770 (browser \`serve.py\` stays on 8765); desktop_app picks next if busy.
+export MYCHAT_PORT="\${MYCHAT_PORT:-8770}"
 mkdir -p "\$HOME/Library/Logs"
+mkdir -p "\$MYCHAT_DATA_DIR"
 LOG="\$HOME/Library/Logs/MyChat.log"
 {
   echo "---- \$(date) launch ----"
   echo "APP_ROOT=\$APP_ROOT"
   echo "PY=\$PY"
+  echo "DATA=\$MYCHAT_DATA_DIR"
+  echo "PORT=\$MYCHAT_PORT"
   cd "\$APP_ROOT" || exit 1
   exec "\$PY" "\$APP_ROOT/desktop_app.py"
 } >>"\$LOG" 2>&1
@@ -149,5 +157,7 @@ touch "$APP"
 
 echo "Built: $APP"
 echo "Open with: open \"$APP\""
-echo "Optional: cp -R \"$APP\" /Applications/"
+echo "Optional: cp -R \"$APP\" ~/Applications/"
+echo "Data: ~/Library/Application Support/MyChat/"
 echo "Logs: ~/Library/Logs/MyChat.log"
+echo "Desktop port: MYCHAT_PORT (default 8770; auto-picks next if busy)"

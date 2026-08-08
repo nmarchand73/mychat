@@ -1,7 +1,7 @@
 /**
  * Intent: conversation thread — bubbles, markdown, think, tool/memory cards.
  * Architecture: .stage/.thread scroll area; message chrome is class-driven (.bubble, .tool-use, .thought).
- * Quality: 8/10 — msg-actions always visible; dock fade is pointer-events none.
+ * Quality: 8/10 — selectable bot text; Copy + ⋯ menu for Regenerate/Delete.
  */
 .stage {
   flex: 1 1 auto;
@@ -118,24 +118,35 @@
   margin: 0;
 }
 
-/* Always visible — hover-hide vanished when the dock fade stole :hover. */
+/* Message text must stay selectable (pywebview also needs text_select=True). */
+.bubble.bot,
+.bubble.bot .md,
+.bubble.user .user-text {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+/* ChatGPT-style: Copy + ⋯ ; Regenerate/Delete live in the more menu. */
 .bubble .msg-actions {
   display: flex;
-  gap: 10px;
-  margin: 10px 0 0;
+  align-items: center;
+  gap: 2px;
+  margin: 8px 0 0;
   justify-content: flex-end;
   opacity: 1;
   pointer-events: auto;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .bubble.user .msg-actions {
-  /* Outside the pink pill so text padding stays even; hit area includes the gap. */
   position: absolute;
   top: 100%;
   right: 0;
   margin: 0;
   padding-top: 6px;
-  z-index: 2;
+  z-index: 6;
 }
 
 .bubble.bot .msg-actions {
@@ -143,25 +154,123 @@
   justify-content: flex-start;
 }
 
-.bubble .msg-actions button {
+.bubble .msg-actions .msg-icon-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.bubble .msg-actions .msg-icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.bubble .msg-actions .msg-icon-btn.copied {
+  color: var(--accent);
+}
+
+.bubble .msg-actions .msg-text-btn {
   appearance: none;
   border: 0;
   background: none;
   color: var(--accent);
   font: 500 0.78rem var(--font-body);
   cursor: pointer;
-  padding: 4px 2px;
+  padding: 4px 8px;
 }
 
-.bubble .msg-actions button.danger {
-  color: var(--danger);
+.bubble .msg-actions .msg-text-btn:hover:not(:disabled) {
+  text-decoration: underline;
 }
 
-.bubble .msg-actions button:hover { text-decoration: underline; }
 .bubble .msg-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   text-decoration: none;
+}
+
+.bubble .msg-more {
+  position: relative;
+  display: inline-flex;
+}
+
+.bubble .msg-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  min-width: 11.5rem;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+  z-index: 8;
+}
+
+.bubble.user .msg-menu {
+  left: auto;
+  right: 0;
+}
+
+.bubble .msg-more.open .msg-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bubble .msg-menu-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 500 0.86rem var(--font-body);
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.bubble .msg-menu-item svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.bubble .msg-menu-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.bubble .msg-menu-item:hover:not(:disabled) svg {
+  color: var(--accent);
+}
+
+.bubble .msg-menu-item.danger {
+  color: var(--danger);
+}
+
+.bubble .msg-menu-item.danger svg {
+  color: var(--danger);
+}
+
+.bubble .msg-menu-item.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .bubble.bot {

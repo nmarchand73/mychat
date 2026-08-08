@@ -3,11 +3,16 @@
  * Architecture: factory `createUi(deps)` returns helpers; persistence / edit /
  * delete / regenerate callbacks stay injected — presentation only.
  * Includes ChatGPT-style image wait tile + top-down frosted reveal on arrival.
- * Quality: 8/10 — msg-actions absolute so text centering/padding fixed; no system actions.
+ * Quality: 8/10 — bot Copy + ⋯ menu (Regenerate/Delete); selectable message text.
  */
 
 import { renderMarkdown, setWorkingPhase } from "./markdown.js";
 import { escapeHtml } from "./util.js";
+
+const ICON_COPY = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`;
+const ICON_MORE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="12" r="1.75"/></svg>`;
+const ICON_REGEN = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><polyline points="21 3 21 9 15 9"/></svg>`;
+const ICON_TRASH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
 
 /**
  * @param {{
@@ -49,12 +54,85 @@ export function createUi(deps) {
     armRefine,
   } = deps;
 
+  function closeMsgMenus(except = null) {
+    thread.querySelectorAll(".msg-more.open").forEach((wrap) => {
+      if (wrap !== except) {
+        wrap.classList.remove("open");
+        wrap.querySelector(".msg-more-btn")?.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  if (!thread.dataset.msgMenuBound) {
+    thread.dataset.msgMenuBound = "1";
+    document.addEventListener("click", (ev) => {
+      if (ev.target.closest?.(".msg-more")) return;
+      closeMsgMenus();
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") closeMsgMenus();
+    });
+  }
+
+  function bubbleCopyText(el) {
+    const md = el.querySelector(":scope > .md");
+    if (md) return md.innerText.replace(/\n{3,}/g, "\n\n").trim();
+    const user = el.querySelector(":scope > .user-text");
+    if (user) return (user.textContent || "").trim();
+    if (el.dataset.prompt) return el.dataset.prompt.trim();
+    const clone = el.cloneNode(true);
+    clone
+      .querySelectorAll(".msg-actions, .img-actions, .label, .img-placeholder")
+      .forEach((n) => n.remove());
+    return (clone.innerText || "").trim();
+  }
+
+  function makeIconButton({ className = "", title, html, onClick }) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `msg-icon-btn ${className}`.trim();
+    btn.title = title;
+    btn.setAttribute("aria-label", title);
+    btn.innerHTML = html;
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onClick(ev, btn);
+    });
+    return btn;
+  }
+
   function attachMsgActions(el, { edit = false, regenerate = false } = {}) {
     const actions = document.createElement("div");
     actions.className = "msg-actions";
+
+    actions.appendChild(
+      makeIconButton({
+        title: "Copy",
+        html: ICON_COPY,
+        onClick: async (_ev, btn) => {
+          const text = bubbleCopyText(el);
+          if (!text) return;
+          try {
+            await navigator.clipboard.writeText(text);
+            btn.classList.add("copied");
+            btn.title = "Copied";
+            btn.setAttribute("aria-label", "Copied");
+            setTimeout(() => {
+              btn.classList.remove("copied");
+              btn.title = "Copy";
+              btn.setAttribute("aria-label", "Copy");
+            }, 1200);
+          } catch {
+            setStatus("Copy failed", "err");
+          }
+        },
+      })
+    );
+
     if (edit) {
       const editBtn = document.createElement("button");
       editBtn.type = "button";
+      editBtn.className = "msg-text-btn";
       editBtn.textContent = "Edit";
       editBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -62,27 +140,59 @@ export function createUi(deps) {
       });
       actions.appendChild(editBtn);
     }
+
+    const moreWrap = document.createElement("div");
+    moreWrap.className = "msg-more";
+
+    const moreBtn = makeIconButton({
+      className: "msg-more-btn",
+      title: "More",
+      html: ICON_MORE,
+      onClick: () => {
+        const open = !moreWrap.classList.contains("open");
+        closeMsgMenus(open ? moreWrap : null);
+        moreWrap.classList.toggle("open", open);
+        moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      },
+    });
+    moreBtn.setAttribute("aria-haspopup", "menu");
+    moreBtn.setAttribute("aria-expanded", "false");
+
+    const menu = document.createElement("div");
+    menu.className = "msg-menu";
+    menu.setAttribute("role", "menu");
+
     if (regenerate && typeof onRegenerateBubble === "function") {
       const regenBtn = document.createElement("button");
       regenBtn.type = "button";
-      regenBtn.textContent = "Regenerate";
+      regenBtn.className = "msg-menu-item";
+      regenBtn.setAttribute("role", "menuitem");
+      regenBtn.innerHTML = `${ICON_REGEN}<span>Regenerate</span>`;
       regenBtn.title = "Redo from the previous user message";
       regenBtn.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        closeMsgMenus();
         onRegenerateBubble(el);
       });
-      actions.appendChild(regenBtn);
+      menu.appendChild(regenBtn);
     }
+
     const delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.className = "danger";
-    delBtn.textContent = "Delete";
+    delBtn.className = "msg-menu-item danger";
+    delBtn.setAttribute("role", "menuitem");
+    delBtn.innerHTML = `${ICON_TRASH}<span>Delete</span>`;
     delBtn.title = "Delete this and everything after";
     delBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
+      closeMsgMenus();
       onDeleteFromBubble(el);
     });
-    actions.appendChild(delBtn);
+    menu.appendChild(delBtn);
+
+    moreWrap.appendChild(moreBtn);
+    moreWrap.appendChild(menu);
+    actions.appendChild(moreWrap);
     el.appendChild(actions);
   }
 
