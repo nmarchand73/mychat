@@ -2,13 +2,14 @@
  * Intent: run one chat turn end-to-end (memory prep → tools → stream answer).
  * Architecture: factory `createChatRunner(deps)` closes over UI/memory callbacks;
  * talks to Ollama `/api/chat` and local `/api/search`; does not own DOM state.
- * Quality: 8/10 — forced search uses conversation topic when prompt is framing-only.
+ * Quality: 8/10 — long prompts skip tools + get larger ctx/predict; system prompt matches tool availability.
  */
 
 import {
   OLLAMA,
   getSearchApi,
   MAX_TOOL_ROUNDS,
+  TOOL_PROMPT_MAX_CHARS,
   WEB_SEARCH_TOOL,
 } from "./config.js";
 import {
@@ -101,13 +102,26 @@ export function createChatRunner(deps) {
     refreshFactList,
   } = deps;
 
-  async function chatOnce({ messages, tools, think, stream, signal }) {
+  async function chatOnce({
+    messages,
+    tools,
+    think,
+    stream,
+    signal,
+    numCtx,
+    numPredict,
+  }) {
+    const options = {
+      temperature: 0.7,
+      num_ctx: numCtx || 8192,
+    };
+    if (numPredict) options.num_predict = numPredict;
     const payload = {
       model: getChatModel(),
       messages,
       stream: Boolean(stream),
       truncate: true,
-      options: { temperature: 0.7, num_ctx: 8192 },
+      options,
     };
     if (think && modelSupportsThink()) payload.think = true;
     if (tools) payload.tools = tools;
@@ -125,6 +139,17 @@ export function createChatRunner(deps) {
     return res;
   }
 
+  function buildBaseSystem({ wantSearch, offerSearchTool }) {
+    if (!wantSearch) {
+      return "You are MyChat, a helpful local assistant. Prefer clear Markdown (headings, lists, fenced code) when it improves readability. Be concise unless asked for detail.";
+    }
+    if (offerSearchTool) {
+      return "You are MyChat, a helpful local assistant. You can call web_search for up-to-date facts. When the user asks to search or research, you MUST call web_search before answering. Prefer clear Markdown. Be concise. Cite links from search results when useful.";
+    }
+    // Search enabled but tools omitted (long brief) — never invent a search.
+    return "You are MyChat, a helpful local assistant. Prefer clear Markdown (headings, lists, fenced code) when it improves readability. Be concise unless asked for detail. Answer from the conversation and your knowledge. Do not invent web search results or claim you searched the web.";
+  }
+
   async function runChat(prompt, signal) {
     const checkpoint = memory.conversation.checkpoint();
     memory.conversation.pushUser(prompt);
@@ -135,6 +160,9 @@ export function createChatRunner(deps) {
     });
     const wantThink = getThinkEnabled();
     const wantSearch = getSearchEnabled();
+    const promptLen = String(prompt || "").length;
+    // Long briefs stall Ollama on non-streaming tool planning — stream instead.
+    const allowToolPlanning = promptLen <= TOOL_PROMPT_MAX_CHARS;
     const thought = wantThink ? createThoughtBlock() : null;
     if (thought) bot.appendChild(thought.el);
     const body = document.createElement("div");
@@ -143,9 +171,10 @@ export function createChatRunner(deps) {
     bot.classList.add("is-generating");
     persistSession();
 
-    const baseSystem = wantSearch
-      ? "You are MyChat, a helpful local assistant. You can call web_search for up-to-date facts. When the user asks to search or research, you MUST call web_search before answering. Prefer clear Markdown. Be concise. Cite links from search results when useful."
-      : "You are MyChat, a helpful local assistant. Prefer clear Markdown (headings, lists, fenced code) when it improves readability. Be concise unless asked for detail.";
+    const baseSystem = buildBaseSystem({
+      wantSearch,
+      offerSearchTool: wantSearch && allowToolPlanning,
+    });
 
     let fullContent = "";
     let fullThinking = "";
@@ -167,6 +196,7 @@ export function createChatRunner(deps) {
         prompt,
         baseSystem,
         signal,
+        offerRememberTool: allowToolPlanning,
       });
       /** @type {object[]} */
       const messages = prepared.messages;
@@ -201,46 +231,54 @@ export function createChatRunner(deps) {
       }
 
       const tools = [];
-      if (wantSearch) tools.push(WEB_SEARCH_TOOL);
-      if (memory.settings.rememberToolEnabled)
+      if (wantSearch && allowToolPlanning) tools.push(WEB_SEARCH_TOOL);
+      if (memory.settings.rememberToolEnabled && allowToolPlanning) {
         tools.push(memory.rememberToolSchema());
+      }
 
       // Explicit search asks: run ddgs immediately (models often skip tools).
       // Inject results as context — avoid synthetic tool_calls that can stall the final answer.
       if (wantSearch && wantsForcedSearch(prompt)) {
         const query = resolveSearchQuery(prompt, messages);
-        const card = createToolUseCard({
-          name: "web_search",
-          input: { query, max_results: 5 },
-          beforeEl: bot,
-        });
-        setStatus(`Searching: ${query}`, "busy");
-        setWorkingPhase(body, "Searching the web…");
-        scrollThreadToBottom();
-        try {
-          const results = await localWebSearch(query, 5, signal);
-          card.setDone(results);
-          const content = formatSearchForModel(results);
-          messages.push({
-            role: "system",
-            content:
-              `## Web search results for "${query}"\n\n${content}\n\n` +
-              "Continue the ongoing conversation using these results. " +
-              "Do not treat short follow-ups like « fais des recherches » as a standalone dictionary query. " +
-              "Cite links. If results are thin or off-topic, say so and ask a clarifying question.",
+        if (!query) {
+          addBubble(
+            "system",
+            "Précisez le sujet à rechercher (ex. « recherche événements Bordeaux »)."
+          );
+        } else {
+          const card = createToolUseCard({
+            name: "web_search",
+            input: { query, max_results: 5 },
+            beforeEl: bot,
           });
-          usedTools = true;
-        } catch (err) {
-          if (isAbortError(err)) throw err;
-          card.setError(String(err.message || err));
-          messages.push({
-            role: "system",
-            content: `Web search failed (${err.message || err}). Answer from conversation context and say search was unavailable.`,
-          });
-          usedTools = true;
-          addBubble("system", `Web search failed: ${err.message || err}`);
+          setStatus(`Searching: ${query}`, "busy");
+          setWorkingPhase(body, "Searching the web…");
+          scrollThreadToBottom();
+          try {
+            const results = await localWebSearch(query, 5, signal);
+            card.setDone(results);
+            const content = formatSearchForModel(results);
+            messages.push({
+              role: "system",
+              content:
+                `## Web search results for "${query}"\n\n${content}\n\n` +
+                "Continue the ongoing conversation using these results. " +
+                "Do not treat short follow-ups like « fais des recherches » as a standalone dictionary query. " +
+                "Cite links. If results are thin or off-topic, say so and ask a clarifying question.",
+            });
+            usedTools = true;
+          } catch (err) {
+            if (isAbortError(err)) throw err;
+            card.setError(String(err.message || err));
+            messages.push({
+              role: "system",
+              content: `Web search failed (${err.message || err}). Answer from conversation context and say search was unavailable.`,
+            });
+            usedTools = true;
+            addBubble("system", `Web search failed: ${err.message || err}`);
+          }
+          persistSession();
         }
-        persistSession();
       } else if (!wantSearch && wantsForcedSearch(prompt)) {
         addBubble(
           "system",
@@ -377,12 +415,15 @@ export function createChatRunner(deps) {
       fullContent = "";
       fullThinking = "";
 
+      const longBrief = promptLen > TOOL_PROMPT_MAX_CHARS;
       const res = await chatOnce({
         messages,
         tools: undefined,
         think: wantThink,
         stream: true,
         signal,
+        numCtx: longBrief ? 16384 : 8192,
+        numPredict: longBrief ? 8192 : undefined,
       });
 
       const reader = res.body.getReader();

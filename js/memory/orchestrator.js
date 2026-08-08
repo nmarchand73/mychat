@@ -69,9 +69,15 @@ export function createMemorySystem(config) {
    *   prompt: string,
    *   baseSystem: string,
    *   signal?: AbortSignal,
+   *   offerRememberTool?: boolean,
    * }} args
    */
-  async function prepareTurn({ prompt, baseSystem, signal }) {
+  async function prepareTurn({
+    prompt,
+    baseSystem,
+    signal,
+    offerRememberTool = true,
+  }) {
     const meta = {
       summarized: false,
       dropped: 0,
@@ -107,7 +113,7 @@ export function createMemorySystem(config) {
       }
     }
 
-    if (settings.rememberToolEnabled) {
+    if (settings.rememberToolEnabled && offerRememberTool) {
       blocks.push(
         "## Memory tools",
         "You may call remember_fact to store a durable user preference or fact for future turns.",

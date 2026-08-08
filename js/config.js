@@ -61,14 +61,25 @@ export const WEB_SEARCH_TOOL = {
   },
 };
 
-/** Explicit “search the web / research” asks — force a local search even if the model skips tools */
+/**
+ * Explicit “search / research” asks — force local ddgs even if the model skips tools.
+ * Keep tight: bare “actualité”, “en ligne”, “latest”, “news” alone are too noisy.
+ */
 export const SEARCH_INTENT = new RegExp(
   [
-    String.raw`\b(web[- ]?search|search\s+the\s+web|google|look\s+up|recherch\w*|cherche[rz]?\b|fait\s+des\s+recherches|faire\s+des\s+recherches|sur\s+le\s+web|en\s+ligne)\b`,
-    String.raw`\b(actualité|actualites|news|latest|aujourd['’]hui|current\s+events)\b`,
+    String.raw`\b(web[- ]?search|search\s+the\s+web)\b`,
+    String.raw`\b(google|look\s+up)\s+\S+`,
+    String.raw`\b(search|rechercher?|cherche[rz]?)\s+\S+`,
+    String.raw`\b(fait|fais|faire|lance|lancer)\s+(des?\s+)?recherches?\b`,
+    String.raw`\bsur\s+le\s+web\b`,
+    String.raw`\b(latest\s+news|current\s+events|dernières?\s+actualités?)\b`,
+    String.raw`\b(actualité|actualites|news)\s+(d[eu]|sur|about|on|today|aujourd)\b`,
   ].join("|"),
   "i"
 );
+
+/** Skip non-streaming tool planning above this prompt size (chars). */
+export const TOOL_PROMPT_MAX_CHARS = 1200;
 
 // Strong positives: explicit generation verbs / visual artefacts
 export const IMAGE_STRONG = new RegExp(

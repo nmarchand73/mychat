@@ -80,11 +80,12 @@ export function resolveSearchQuery(prompt, messages = []) {
     if (m?.role !== "assistant") continue;
     const plain = String(m.content || "")
       .replace(/```[\s\S]*?```/g, " ")
-      .replace(/[#>*_`\[\]]/g, " ")
+      .replace(/[[\]#>*_`]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
     if (plain.length > 48) return plain.slice(0, 160);
   }
 
-  return String(prompt || "").trim().slice(0, 240);
+  // Framing-only with no prior topic — do not search the phrase itself.
+  return "";
 }
