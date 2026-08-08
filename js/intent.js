@@ -1,18 +1,10 @@
 /**
- * Intent: decide chat vs image vs refine for Auto mode (and forced modes).
- * Architecture: cheap regex first, optional Ollama one-word classifier;
- * pure functions — callers pass lastImage/refineArmed/getChatModel.
+ * Intent: decide chat vs image vs refine from the explicit mode toggle.
+ * Architecture: no Auto classifier — Image mode only paints; Chat stays chat.
+ * Quality: 8/10 — false Auto→Image switches removed; refine still Image-only.
  */
 
-import {
-  OLLAMA,
-  IMAGE_STRONG,
-  IMAGE_SOFT,
-  IMAGE_NEGATIVE,
-  REFINE_HINT,
-} from "./config.js";
-import { stripThink } from "./markdown.js";
-import { isAbortError, StoppedError } from "./util.js";
+import { IMAGE_STRONG, IMAGE_SOFT, IMAGE_NEGATIVE, REFINE_HINT } from "./config.js";
 
 export function isQuestionLike(text) {
   return (
@@ -49,66 +41,15 @@ export function wantsImage(text) {
   return false;
 }
 
-export async function classifyImageIntent(text, {
-  signal,
-  getChatModel,
-  lastImageB64,
-  refineArmed,
-}) {
-  if (wantsRefine(text, { lastImageB64, refineArmed })) return "refine";
-  if (IMAGE_STRONG.test(text)) return "image";
-  if (IMAGE_NEGATIVE.test(text)) return "chat";
-  if (!IMAGE_SOFT.test(text) && text.split(/\s+/).length > 12) {
-    return wantsImage(text) ? "image" : "chat";
-  }
-
-  try {
-    const res = await fetch(`${OLLAMA}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal,
-      body: JSON.stringify({
-        model: getChatModel(),
-        stream: false,
-        options: { temperature: 0, num_predict: 8 },
-        messages: [
-          {
-            role: "system",
-            content:
-              "You route user prompts. Reply with only one word: IMAGE (new picture), REFINE (edit an existing/last picture), or CHAT (question, explanation, code).",
-          },
-          { role: "user", content: text },
-        ],
-      }),
-    });
-    if (!res.ok) return wantsImage(text) ? "image" : "chat";
-    const data = await res.json();
-    const reply = stripThink(data?.message?.content || "").toUpperCase();
-    if (/\bREFINE\b/.test(reply) && lastImageB64) return "refine";
-    if (/\bIMAGE\b/.test(reply)) return "image";
-    if (/\bCHAT\b/.test(reply)) return "chat";
-  } catch (err) {
-    if (isAbortError(err)) throw new StoppedError();
-  }
-  return wantsImage(text) ? "image" : "chat";
-}
-
 export async function resolveMode(text, {
   mode,
-  signal,
-  getChatModel,
   lastImageB64,
   refineArmed,
 }) {
-  if (mode === "chat") return "chat";
+  // No Auto routing — Image mode paints; everything else stays chat.
   if (mode === "image") {
     if (wantsRefine(text, { lastImageB64, refineArmed })) return "refine";
     return "image";
   }
-  return classifyImageIntent(text, {
-    signal,
-    getChatModel,
-    lastImageB64,
-    refineArmed,
-  });
+  return "chat";
 }

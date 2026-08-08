@@ -3,7 +3,7 @@
 
 Local chat UI for [Ollama](https://ollama.com) — chat, web search, image generation, and a layered memory stack. Everything runs on your machine; no cloud accounts.
 
-**Chat** · **Auto / Image** routing · **DuckDuckGo search** · **Flux images** · **Facts + RAG + auto-summarize**
+**Chat** · **Image** (explicit) · **DuckDuckGo search** · **Flux images** · **Facts + RAG + auto-summarize**
 
 ---
 
@@ -72,9 +72,9 @@ Dev window without rebuilding the `.app`:
 
 - **Chat** — streaming Markdown answers via Ollama `/api/chat`
 - **Multi-chat sidebar** — new / switch / delete threads; collapsible panel
-- **Auto mode** — routes prompts to chat, image, or refine (regex + optional classifier)
+- **Modes** — **Chat** (default) or **Image**; no Auto routing between text and pictures
 - **Web search** — model tool `web_search` → local DuckDuckGo (`ddgs`) through `serve.py` (tool cards persist)
-- **Images** — Flux generate / refine; refine reuses the last image when armed
+- **Images** — Flux generate / refine in Image mode; refine reuses the last image when armed
 - **Think** — reasoning UI for `qwen3.5:9b` only (Ministral rejects `think`)
 - **Edit / Delete / Regenerate** — trim the thread from a message; redo the last answer
 - **Export** — download the active chat as Markdown (Settings)
@@ -99,7 +99,7 @@ Browser (index.html)
      ├── ui.js            bubbles, tool cards, banners
      ├── session.js       multi-chat persist / restore
      ├── export.js        thread → Markdown download
-     ├── intent.js        Auto → chat | image | refine
+     ├── intent.js        Chat | Image (explicit; no Auto)
      ├── markdown.js      think tags + safe Markdown
      ├── config.js        models, keys, tools, regexes
      └── memory/          conversation · facts · summarizer · rag · orchestrator

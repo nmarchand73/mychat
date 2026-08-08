@@ -58,8 +58,7 @@
           </div>
           <div class="top-controls">
             <div class="modes" role="group" aria-label="Mode">
-              <button type="button" data-mode="auto" aria-pressed="true">Auto</button>
-              <button type="button" data-mode="chat" aria-pressed="false">Chat</button>
+              <button type="button" data-mode="chat" aria-pressed="true">Chat</button>
               <button type="button" data-mode="image" aria-pressed="false">Image</button>
             </div>
             <details class="settings" id="settings">
@@ -156,11 +155,11 @@
           <div class="thread" id="thread" aria-live="polite">
             <div class="empty" id="empty">
               <strong>How can I help?</strong>
-              <p class="empty-lead">Ask a question, search the web, or describe an image to generate.</p>
+              <p class="empty-lead">Ask a question or search the web. Switch to Image to generate a picture.</p>
               <div class="suggestions" id="suggestions" role="group" aria-label="Suggestions">
                 <button type="button" data-prompt="What are the top AI news stories today?">Search the web</button>
                 <button type="button" data-prompt="Explain how local RAG memory works in simple terms.">Explain something</button>
-                <button type="button" data-prompt="Draw a cozy rainy café window at night, neon reflections on wet pavement">Generate an image</button>
+                <button type="button" data-mode="image" data-prompt="Draw a cozy rainy café window at night, neon reflections on wet pavement">Generate an image</button>
                 <button type="button" data-prompt="Remember that I prefer concise answers in French.">Save a preference</button>
               </div>
             </div>

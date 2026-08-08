@@ -2,7 +2,7 @@
  * Intent: run one chat turn end-to-end (memory prep → tools → stream answer).
  * Architecture: factory `createChatRunner(deps)` closes over UI/memory callbacks;
  * talks to Ollama `/api/chat` and local `/api/search`; does not own DOM state.
- * Quality: 8/10 — forced search injects system results then streams final answer; no synthetic tool_calls; runChat still long
+ * Quality: 8/10 — forced search uses conversation topic when prompt is framing-only.
  */
 
 import {
@@ -10,7 +10,6 @@ import {
   getSearchApi,
   MAX_TOOL_ROUNDS,
   WEB_SEARCH_TOOL,
-  SEARCH_INTENT,
 } from "./config.js";
 import {
   createThoughtBlock,
@@ -19,6 +18,11 @@ import {
   setWorkingPhase,
   stripThink,
 } from "./markdown.js";
+import {
+  extractSearchQuery,
+  resolveSearchQuery,
+  wantsForcedSearch,
+} from "./search_query.js";
 import { isAbortError, StoppedError } from "./util.js";
 
 export async function localWebSearch(query, maxResults = 5, signal) {
@@ -40,30 +44,7 @@ export function formatSearchForModel(results) {
     .join("\n\n");
 }
 
-export function wantsForcedSearch(text) {
-  return SEARCH_INTENT.test(String(text || ""));
-}
-
-/** Strip “search the web” framing so ddgs gets a usable query. */
-export function extractSearchQuery(text) {
-  const raw = String(text || "").trim();
-  const cleaned = raw
-    .replace(
-      /^(peux[- ]tu|can you|please|svp|s'il te pla[iî]t)\s+/i,
-      ""
-    )
-    .replace(
-      /\b(fait|fais|faire|lance|lancer)\s+(des?\s+)?recherches?\s*((sur\s+le\s+web|web|en ligne)\s*)?[:\-]?\s*/i,
-      ""
-    )
-    .replace(
-      /\b(search|google|look\s+up|rechercher?|cherche[rz]?)\s*((the\s+web|online|en ligne|sur\s+le\s+web)\s*(for\s+)?)?/i,
-      ""
-    )
-    .replace(/^[:\-–—]\s*/, "")
-    .trim();
-  return cleaned || raw;
-}
+export { extractSearchQuery, resolveSearchQuery, wantsForcedSearch };
 
 function toolCallName(call) {
   return (
@@ -227,7 +208,7 @@ export function createChatRunner(deps) {
       // Explicit search asks: run ddgs immediately (models often skip tools).
       // Inject results as context — avoid synthetic tool_calls that can stall the final answer.
       if (wantSearch && wantsForcedSearch(prompt)) {
-        const query = extractSearchQuery(prompt);
+        const query = resolveSearchQuery(prompt, messages);
         const card = createToolUseCard({
           name: "web_search",
           input: { query, max_results: 5 },
@@ -244,7 +225,9 @@ export function createChatRunner(deps) {
             role: "system",
             content:
               `## Web search results for "${query}"\n\n${content}\n\n` +
-              "Answer the user using these results. Cite links. If results are thin, say so.",
+              "Continue the ongoing conversation using these results. " +
+              "Do not treat short follow-ups like « fais des recherches » as a standalone dictionary query. " +
+              "Cite links. If results are thin or off-topic, say so and ask a clarifying question.",
           });
           usedTools = true;
         } catch (err) {
@@ -252,7 +235,7 @@ export function createChatRunner(deps) {
           card.setError(String(err.message || err));
           messages.push({
             role: "system",
-            content: `Web search failed (${err.message || err}). Answer from what you know and say search was unavailable.`,
+            content: `Web search failed (${err.message || err}). Answer from conversation context and say search was unavailable.`,
           });
           usedTools = true;
           addBubble("system", `Web search failed: ${err.message || err}`);

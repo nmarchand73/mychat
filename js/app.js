@@ -68,7 +68,7 @@ const sidebarClose = document.getElementById("sidebarClose");
 const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 const modeButtons = [...document.querySelectorAll(".modes button")];
 
-let mode = "auto";
+let mode = "chat";
 let busy = false;
 /** @type {AbortController | null} */
 let activeAbort = null;
@@ -705,7 +705,7 @@ async function runUserTurn(prompt, { skipUserBubble = false } = {}) {
     clearEditState();
     addBubble("user", text);
   }
-  setStatus(mode === "auto" ? "Detecting…" : "Working…", "busy");
+  setStatus("Working…", "busy");
 
   try {
     const chosen = await resolveMode(text, {
@@ -716,15 +716,6 @@ async function runUserTurn(prompt, { skipUserBubble = false } = {}) {
       refineArmed,
     });
     if (controller.signal.aborted) throw new StoppedError();
-    if (mode === "auto") {
-      const label =
-        chosen === "refine"
-          ? "Auto → Refine"
-          : chosen === "image"
-            ? "Auto → Image"
-            : "Auto → Chat";
-      addBubble("system", label);
-    }
     if (chosen === "refine") {
       if (!lastImageB64)
         throw new Error("No image to refine yet — generate one first.");
@@ -1005,6 +996,13 @@ suggestionsEl?.addEventListener("click", (e) => {
   if (!btn || busy) return;
   const text = btn.dataset.prompt || "";
   if (!text) return;
+  const forcedMode = btn.dataset.mode;
+  if (forcedMode === "chat" || forcedMode === "image") {
+    mode = forcedMode;
+    modeButtons.forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.mode === mode))
+    );
+  }
   promptEl.value = text;
   promptEl.focus();
   promptEl.style.height = "auto";

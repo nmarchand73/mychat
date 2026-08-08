@@ -21,7 +21,7 @@ js/image.js         Flux generate / refine
 js/ui.js            DOM helpers (bubbles, cards, banners, status)
 js/session.js       multi-chat library (v3 localStorage) + active thread persist/restore
 js/export.js        thread → Markdown download
-js/intent.js        Auto → chat | image | refine
+js/intent.js        Chat | Image (explicit; no Auto)
 js/markdown.js      think tags + safe Markdown (links open in new tab)
 js/util.js          StoppedError, abort detection, escapeHtml
 js/memory/*         conversation, facts, summarizer, rag, orchestrator facade
