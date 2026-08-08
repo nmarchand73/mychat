@@ -1,7 +1,7 @@
 /**
  * Intent: conversation thread — bubbles, markdown, think, tool/memory cards.
  * Architecture: .stage/.thread scroll area; message chrome is class-driven (.bubble, .tool-use, .thought).
- * Quality: 8/10 — selectable bot text; Copy + ⋯ menu for Regenerate/Delete.
+ * Quality: 8/10 — user actions in-flow under the pink pill (no overlap with next msg).
  */
 .stage {
   flex: 1 1 auto;
@@ -99,15 +99,15 @@
   width: fit-content;
   max-width: min(85%, 36rem);
   margin-left: auto;
-  background: var(--user);
-  border: 1px solid var(--accent-soft);
-  border-radius: 22px;
-  border-bottom-right-radius: 8px;
-  padding: 12px 16px;
+  /* Chrome lives on .user-text so actions can sit below the pill in-flow. */
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   white-space: pre-wrap;
   position: relative;
   color: var(--ink);
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
   text-align: left;
 }
 
@@ -116,6 +116,12 @@
   font-size: 1.02rem;
   line-height: 1.45;
   margin: 0;
+  padding: 12px 16px;
+  background: var(--user);
+  border: 1px solid var(--accent-soft);
+  border-radius: 22px;
+  border-bottom-right-radius: 8px;
+  box-shadow: var(--shadow-soft);
 }
 
 /* Message text must stay selectable (pywebview also needs text_select=True). */
@@ -132,7 +138,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   justify-content: flex-end;
   opacity: 1;
   pointer-events: auto;
@@ -141,17 +147,15 @@
 }
 
 .bubble.user .msg-actions {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin: 0;
-  padding-top: 6px;
-  z-index: 6;
+  position: static;
+  margin-top: 4px;
+  justify-content: flex-end;
 }
 
 .bubble.bot .msg-actions {
   position: static;
   justify-content: flex-start;
+  margin-top: 8px;
 }
 
 .bubble .msg-actions .msg-icon-btn {
