@@ -172,44 +172,6 @@
   margin: 2px 0;
 }
 
-.memory-box {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--accent-pale) 35%, var(--bg-elev));
-}
-
-.memory-add {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-
-.memory-box input[type="text"],
-.memory-box textarea {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg-soft);
-  color: var(--ink);
-  font: 400 0.86rem var(--font-body);
-  padding: 8px 10px;
-  outline: none;
-  resize: vertical;
-}
-
-.memory-box input:focus,
-.memory-box textarea:focus {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-}
-
-.settings-panel .ghost.tight {
-  width: auto;
-  padding: 7px 10px;
-}
-
 .font-size-picks {
   display: inline-flex;
   padding: 3px;
@@ -238,37 +200,3 @@
 }
 
 .font-size-picks button:hover { color: var(--ink); }
-
-.fact-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  max-height: 140px;
-  overflow-y: auto;
-}
-
-.fact-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-  line-height: 1.35;
-}
-
-.fact-list li span { flex: 1; min-width: 0; }
-
-.fact-list button {
-  appearance: none;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 0.75rem;
-  padding: 0;
-  flex: 0 0 auto;
-}
-
-.fact-list button:hover { color: var(--danger); }

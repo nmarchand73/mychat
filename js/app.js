@@ -44,12 +44,6 @@ const factsToggleEl = document.getElementById("factsToggle");
 const ragToggleEl = document.getElementById("ragToggle");
 const summarizeToggleEl = document.getElementById("summarizeToggle");
 const rememberToolToggleEl = document.getElementById("rememberToolToggle");
-const factInputEl = document.getElementById("factInput");
-const addFactBtn = document.getElementById("addFactBtn");
-const factListEl = document.getElementById("factList");
-const ragInputEl = document.getElementById("ragInput");
-const ragIngestBtn = document.getElementById("ragIngestBtn");
-const ragStatusEl = document.getElementById("ragStatus");
 const statusEl = document.getElementById("status");
 const dot = document.getElementById("dot");
 const refineBanner = document.getElementById("refineBanner");
@@ -622,45 +616,11 @@ function syncMemoryToggles() {
 }
 
 function refreshFactList() {
-  if (!factListEl) return;
-  factListEl.innerHTML = "";
-  const facts = memory.facts.list();
-  if (!facts.length) {
-    factListEl.innerHTML = `<li><span style="color:var(--muted)">No facts yet</span></li>`;
-    return;
-  }
-  for (const f of facts) {
-    const li = document.createElement("li");
-    const span = document.createElement("span");
-    span.textContent = f.text;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = "Remove";
-    btn.addEventListener("click", () => {
-      memory.facts.remove(f.id);
-      refreshFactList();
-      setStatus("Fact removed", "ok");
-    });
-    li.appendChild(span);
-    li.appendChild(btn);
-    factListEl.appendChild(li);
-  }
+  /* Manual fact list UI removed — facts still update via remember_fact tool. */
 }
 
 async function refreshRagStatus() {
-  if (!ragStatusEl) return;
-  try {
-    const h = await memory.rag.health();
-    if (!h.ok) {
-      ragStatusEl.textContent = "RAG: Ollama unreachable";
-      return;
-    }
-    ragStatusEl.textContent = h.embed_ready
-      ? `RAG: ${h.chunks || 0} chunk(s) · ${h.embed_model}`
-      : `RAG: pull ${h.embed_model} in Ollama`;
-  } catch {
-    ragStatusEl.textContent = "RAG: unavailable (is serve.py running?)";
-  }
+  /* Manual RAG ingest UI removed — health still checked in status bar. */
 }
 
 const chat = createChatRunner({
@@ -871,8 +831,6 @@ fontSizePicks?.addEventListener("click", (e) => {
 });
 
 syncMemoryToggles();
-refreshFactList();
-refreshRagStatus();
 
 factsToggleEl?.addEventListener("change", () => {
   memory.settings.factsEnabled = factsToggleEl.checked;
@@ -901,38 +859,6 @@ rememberToolToggleEl?.addEventListener("change", () => {
       : "remember_fact tool off",
     "ok"
   );
-});
-
-addFactBtn?.addEventListener("click", () => {
-  const text = factInputEl?.value.trim() || "";
-  if (!text) return;
-  memory.facts.add(text);
-  factInputEl.value = "";
-  refreshFactList();
-  setStatus("Fact saved", "ok");
-});
-factInputEl?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    addFactBtn?.click();
-  }
-});
-
-ragIngestBtn?.addEventListener("click", async () => {
-  const text = ragInputEl?.value.trim() || "";
-  if (!text) return;
-  ragIngestBtn.disabled = true;
-  setStatus("Embedding note…", "busy");
-  try {
-    const result = await memory.rag.ingest(text, { source: "settings" });
-    ragInputEl.value = "";
-    await refreshRagStatus();
-    setStatus(`RAG: added ${result.added || 0} chunk(s)`, "ok");
-  } catch (err) {
-    setStatus(String(err.message || err), "err");
-  } finally {
-    ragIngestBtn.disabled = false;
-  }
 });
 
 stopBtn.addEventListener("click", () => {
