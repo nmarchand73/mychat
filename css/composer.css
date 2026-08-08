@@ -1,6 +1,6 @@
 /**
  * Intent: bottom dock — composer, send/stop, refine/edit banners, status.
- * Architecture: fixed dock over the thread; form.busy swaps send ↔ stop.
+ * Architecture: dock over thread; fade is pointer-events:none so msg-actions stay clickable.
  * Quality: 8/10 — busy breathe + status shimmer; still no voice/input polish
  */
 .dock {
@@ -12,6 +12,8 @@
   background:
     linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 70%, transparent) 28%, var(--bg));
   z-index: 4;
+  /* Fade zone must not steal hover/clicks from thread actions underneath */
+  pointer-events: none;
 }
 
 .dock-inner {
@@ -19,6 +21,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .edit-banner,
